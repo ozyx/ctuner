@@ -7,29 +7,21 @@ on:
   pull_request:
 
 jobs:
-  build-windows:
+  build-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: "actions/checkout@v2"
-      - name: Install g++-mingw-w64
+        uses: "actions/checkout@v4"
+      - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install g++-mingw-w64 build-essential libgtk-3-dev libasound2-dev
+          sudo apt install build-essential libgtk-3-dev libasound2-dev
       - name: Build tools
         run: |
-          cd windows
-          make GXX=x86_64-w64-mingw32-g++ WINDRES=x86_64-w64-mingw32-windres
-          cd ../linux
+          cd linux
           make
-          cd ..
-      - name: Upload windows
-        uses: actions/upload-artifact@v2
-        with:
-          name: Tuner.exe
-          path: windows/Tuner.exe
       - name: Upload linux
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Tuner
           path: linux/tuner
@@ -37,18 +29,18 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: "actions/checkout@v2"
+        uses: "actions/checkout@v4"
       - name: Build tools
         run: |
           cd swift
           make dmg
       - name: Upload Tuner
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Tuner.app
           path: swift/Tuner.app
       - name: Upload Dmg
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Tuner-1.08.dmg
           path: swift/Tuner-1.08.dmg
