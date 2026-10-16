@@ -4,16 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A musical instrument strobe tuner (by Bill Farmer, GPLv3) with four independent native ports in sibling directories. There is no shared code between ports; each is a self-contained GUI app with its own copy of the FFT/peak-detection pipeline and its own `Temperaments.h`.
+A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent native ports in sibling directories. There is no shared code between ports; each is a self-contained GUI app with its own copy of the FFT/peak-detection pipeline and its own `Temperaments.h`.
 
 | Dir | Platform | Language / toolkit | Status |
 | --- | --- | --- | --- |
 | `swift/` | macOS 10.12+ (x86_64 + arm64) | Swift + Objective-C, AppKit, CoreAudio, Accelerate | Current Mac app; most active |
-| `windows/` | Windows | C++, Win32 + GDI+ | Current |
 | `linux/` | Linux | C++, GTK3 + ALSA (`tuner.cpp`); `tuner.c` is an older GTK2 version | Current |
 | `mac/` | macOS 10.4 (i386, Carbon) | C | Legacy, superseded by `swift/` |
 
-`docs/` is a generated Hugo site (GitHub Pages), not source. `scripts/build.sh` is a leftover Travis script; CI is `.github/workflows/build.yml`. `docs/solutions/` holds documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type).
+`docs/` is a generated Hugo site (GitHub Pages), not source. CI is `.github/workflows/build.yml`. `docs/solutions/` holds documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type).
 
 ## Build commands
 
@@ -27,9 +26,6 @@ cd swift && make clean
 
 # Linux
 cd linux && make            # needs libgtk-3-dev libasound2-dev
-
-# Windows (cross-compile from Linux, as CI does)
-cd windows && make GXX=x86_64-w64-mingw32-g++ WINDRES=x86_64-w64-mingw32-windres
 ```
 
 Linux notes: use the plain `Makefile`, not autoconf. Running `./configure` overwrites `Makefile` with one that doesn't work; `Makefile.de` is the backup.
@@ -52,7 +48,7 @@ The Makefile copies Swift runtime dylibs from a hard-coded Xcode path (`XCODELIB
 ## Conventions
 
 - Version lives in `swift/Info.plist` (`CFBundleShortVersionString`); the CI workflow hard-codes the matching DMG filename (`Tuner-<version>.dmg`) in `.github/workflows/build.yml`, so bump both together.
-- Keyboard shortcuts and click actions per view are documented in `README.md` (Windows) and `swift/README.md` (Mac); keep them in sync with `keyDown`/`mouseDown` handlers when changing behaviour.
-- Build artifacts (`*.app`, `*.dmg`, `*.o`, `*.exe`) are gitignored; `.gitignore` also ignores all dotfiles, so new dot-directories need an explicit `!` entry.
+- Keyboard shortcuts and click actions per view are documented in `swift/README.md`; keep them in sync with `keyDown`/`mouseDown` handlers when changing behaviour.
+- Build artifacts (`*.app`, `*.dmg`, `*.o`) are gitignored; `.gitignore` also ignores all dotfiles, so new dot-directories need an explicit `!` entry.
 - After a solved, verified problem, automatically invoke the `ce-compound` skill with `mode:non-interactive` at the completion checkpoint only when the work produced durable project reasoning that is not readily recoverable from the final code, tests, types, comments, or existing documentation, and losing it would plausibly cause recurrence, material risk, or substantial rediscovery. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not invoke it. Completion, effort, and diff size alone are not enough. Capture at the checkpoint so a qualifying learning can ship in the PR that produced it, and only where the repository treats captured learnings as tracked, committed knowledge.
 - Write every report, summary, or handoff to the user through the `ce-noslop` skill. This applies when you are the top-level agent writing to the user, not when you are a subagent reporting to its caller. Do not apply it to code, config, verbatim quotes, or text the user asked to post as written.
