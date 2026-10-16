@@ -5,3 +5,7 @@
 *.app
 *.dSYM
 *.dmg
+
+# Compound Engineering config (dotfiles are ignored above)
+!.compound-engineering/
+.compound-engineering/*.local.yaml
