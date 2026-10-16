@@ -47,7 +47,7 @@ SFLAGS = -target arm64-apple-macos14 -swift-version 5 -module-name Tuner \
 
 CFLAGS = -target arm64-apple-macos14
 
-$(APPBUNDLE): $(APPNAME) $(APPNAME).icns Info.plist
+$(APPBUNDLE): $(APPNAME) $(APPNAME).icns Info.plist PkgInfo $(APPNAME).entitlements
 	$(RM) -rf $(APPBUNDLE)
 	$(MD) -p $(APPBUNDLEMACOS)
 	$(MD) -p $(APPBUNDLERESOURCES)
