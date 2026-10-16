@@ -49,117 +49,95 @@ class MeterView: TunerView
     {
         super.draw(dirtyRect)
 
-        // Do the inertia calculation
-        mc = ((mc * 19) + c) / 20
+        // Do the inertia calculation, light enough to follow every
+        // measurement the audio code now sends
+        mc = ((mc * 3) + c) / 4
 
         // Context
         let context = NSGraphicsContext.current!
 
-        // Text and tick sizes
-        let textSize = CGFloat(height / 3)
-        let tickSize = CGFloat(height / 6)
-        let tickSize2 = tickSize / 2
+        // Text, tick and bar sizes
+        let textSize = height / 5
+        let tickSize = height / 8
+        let barSize = height / 5
 
-        // Font
-        let font = NSFont.systemFont(ofSize: textSize)
-        var attribs: [NSAttributedString.Key: Any] = [.font: font]
+        // Font, with fixed width digits so the numbers don't jitter
+        let font = NSFont.monospacedDigitSystemFont(ofSize: textSize,
+                                                    weight: .regular)
+        let attribs: [NSAttributedString.Key: Any] = [.font: font]
+        let textHeight = "0".size(withAttributes: attribs).height
 
-        // Scale text if necessary
-        let dx = "50".size(withAttributes: attribs).width
-        if (dx >= width / 11)
-        {
-            let expansion = log((width / 12) / dx)
-            attribs = [.font: font, .expansion: expansion]
-        }
         // Drawing code here.
         NSEraseRect(rect)
 
-        // Move the origin
-        context.cgContext.translateBy(x: rect.midX, y: rect.maxY - textSize -
-                                          tickSize2)
-        // Draw the meter scale
-        for i in 0 ..< 6
+        // Scale runs from -50 to +50 cents, leaving room for the end labels
+        let margin = "-50".size(withAttributes: attribs).width / 2 + 4
+        let left = rect.minX + margin
+        let right = rect.maxX - margin
+        let centre = (left + right) / 2
+        let perCent = (right - left) / 100
+
+        // Draw the labels
+        let labelY = rect.maxY - textHeight - 2
+        for (v, s) in [(-50, "-50"), (-25, "-25"), (0, "0"),
+                       (25, "+25"), (50, "+50")]
         {
-	    if (i == 0)
-            {
-                let offset = "0".size(withAttributes: attribs).width / 2
-	        "0".draw(at: NSMakePoint(-offset, 0), withAttributes: attribs)
-            }
-
-	    else
-	    {
-	        let x = width / 11 * CGFloat(i)
-	        let s = String(format:"%d", i * 10)
-                let offset = s.size(withAttributes: attribs).width / 2
-
-	        s.draw(at: NSMakePoint(CGFloat(x) - offset, 0),
-                       withAttributes: attribs)
-	        s.draw(at: NSMakePoint(-CGFloat(x) - offset, 0),
-                       withAttributes: attribs)
-	    }
+            let x = centre + CGFloat(v) * perCent
+            let offset = s.size(withAttributes: attribs).width / 2
+            s.draw(at: NSMakePoint(x - offset, labelY),
+                   withAttributes: attribs)
         }
 
-        // Move the origin
-        context.cgContext.translateBy(x: 0, y: -tickSize)
-        context.shouldAntialias = false;
-
-        for i in 0 ..< 6
+        // Draw the ticks, every 5 cents, long ones under the labels
+        let tickTop = labelY
+        NSColor.black.set()
+        context.shouldAntialias = false
+        for v in stride(from: -50, through: 50, by: 5)
         {
-	    let x = width / 11 * CGFloat(i)
+            let x = centre + CGFloat(v) * perCent
+            let length = (v % 25 == 0) ? tickSize: tickSize / 2
+            NSBezierPath.strokeLine(from: NSMakePoint(x, tickTop),
+                                    to: NSMakePoint(x, tickTop - length))
+        }
+        context.shouldAntialias = true
 
-	    NSBezierPath.strokeLine(from: NSMakePoint(CGFloat(x), 0),
-	                            to: NSMakePoint(CGFloat(x), tickSize))
+        // Draw the track
+        let barY = tickTop - tickSize - 4 - barSize
+        NSColor(white: 0.9, alpha: 1).set()
+        NSBezierPath.fill(NSMakeRect(left, barY, right - left, barSize))
 
-	    NSBezierPath.strokeLine(from: NSMakePoint(-CGFloat(x), 0),
-	                            to: NSMakePoint(-CGFloat(x), tickSize))
-
-	    for j in 1 ..< 5
-	    {
-                let jx = CGFloat(j) * width / 55
-
-	        if (i < 5)
-	        {
-		    NSBezierPath
-                      .strokeLine(from: NSMakePoint(CGFloat(x + jx), 0),
-		                  to: NSMakePoint(CGFloat(x + jx), tickSize2))
-	        }
-
-	        NSBezierPath
-                  .strokeLine(from: NSMakePoint(CGFloat(-x + jx), 0),
-	                      to: NSMakePoint(CGFloat(-x + jx), tickSize2))
-	    }
+        // Nothing more to show without a note
+        if (displayView.f == 0)
+        {
+            return
         }
 
-        // Move the origin
-        context.cgContext.translateBy(x: 0, y: -tickSize)
-        NSColor.gray.set()
+        // Draw the bar from the centre to the measured cents, green
+        // when within 5 cents, grey once the reading is no longer live,
+        // at least 3 points wide so it shows
+        let cents = mc * 100
+        let x = centre + CGFloat(max(-50, min(50, cents))) * perCent
+        let barWidth = max(abs(x - centre), 3)
+        let barX = (cents < 0) ? centre - barWidth: centre
+        let inTune = abs(cents) <= 5
+        let stale = displayView.stale
+        (stale ? NSColor.lightGray:
+           inTune ? NSColor.systemGreen: NSColor.systemOrange).set()
+        NSBezierPath.fill(NSMakeRect(barX, barY, barWidth, barSize))
 
-        // Draw bar
-        NSBezierPath.fill(NSMakeRect(width / 36 - width / 2, -height / 32,
-                                       width - width / 18, height / 32))
+        // Draw the centre line over the bar
+        NSColor.darkGray.set()
+        NSBezierPath.fill(NSMakeRect(centre - 0.5, barY, 1, barSize))
 
-        // Gradient
-        let gradient = NSGradient(colors: [NSColor.gray,
-                                           NSColor.white,
-                                           NSColor.gray])!
-        // Thumb
-        let thumb = NSBezierPath()
-        thumb.move(to: NSMakePoint(0, 2))
-        thumb.line(to: NSMakePoint(1, 1))
-        thumb.line(to: NSMakePoint(1, -2))
-        thumb.line(to: NSMakePoint(-1, -2))
-        thumb.line(to: NSMakePoint(-1, 1))
-        thumb.close()
-
-        // Transform
-        let scale = AffineTransform(scale: height / 16)
-        let translate =
-          AffineTransform(translationByX: CGFloat(mc) * (width * 10 / 11),
-                          byY: 0)
-        thumb.transform(using: scale)
-        thumb.transform(using: translate)
-        context.shouldAntialias = true;
-        gradient.draw(in: thumb, angle: 90)
-        thumb.stroke()
+        // Draw the cents under the bar
+        let s = String(format: "%+.1f\u{00A2}", cents)
+        let offset = s.size(withAttributes: attribs).width / 2
+        var centsAttribs = attribs
+        if (stale)
+        {
+            centsAttribs[.foregroundColor] = NSColor.gray
+        }
+        s.draw(at: NSMakePoint(centre - offset, barY - textHeight - 2),
+               withAttributes: centsAttribs)
     }
 }
