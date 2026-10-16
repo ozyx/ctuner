@@ -47,6 +47,7 @@ The app links against the Swift runtime that ships with macOS and nothing is bun
 
 ## Conventions
 
+- Every change ships as a pull request against `master`. Do the work in a git worktree on a feature branch (the `ce-worktree` skill sets one up), and never commit to or push `master` directly. CI builds the macOS and Linux apps on each pull request. Worktree directories (`.claude/worktrees/`, `.worktrees/`) are dot-directories, so `.gitignore` already ignores them. Older plans in `docs/plans/` that say the implementer "commits to `master` and pushes" record how that work shipped, not the current workflow.
 - Version lives in `swift/Info.plist` (`CFBundleShortVersionString`); `make dmg` names the DMG from it and CI uploads whichever DMG that produces.
 - Keyboard shortcuts and click actions per view are documented in `swift/README.md`; keep them in sync with `keyDown`/`mouseDown` handlers when changing behaviour.
 - Build artifacts (`*.app`, `*.dmg`, `*.o`) are gitignored; `.gitignore` also ignores all dotfiles, so new dot-directories need an explicit `!` entry.
