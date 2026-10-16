@@ -8,7 +8,7 @@ A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent
 
 | Dir | Platform | Language / toolkit | Status |
 | --- | --- | --- | --- |
-| `swift/` | macOS 10.12+ (x86_64 + arm64) | Swift + Objective-C, AppKit, CoreAudio, Accelerate | Current Mac app; most active |
+| `swift/` | macOS 14+ (arm64) | Swift + Objective-C, AppKit, CoreAudio, Accelerate | Current Mac app; most active |
 | `linux/` | Linux | C++, GTK3 + ALSA (`tuner.cpp`); `tuner.c` is an older GTK2 version | Current |
 | `mac/` | macOS 10.4 (i386, Carbon) | C | Legacy, superseded by `swift/` |
 
@@ -19,7 +19,7 @@ A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent
 Everything is plain `make`; no tests exist in the repo.
 
 ```sh
-# macOS (Swift app) — builds a universal binary and Tuner.app
+# macOS (Swift app) — builds an arm64 binary and Tuner.app
 cd swift && make            # Tuner.app
 cd swift && make dmg        # Tuner-<version>.dmg (version read from Info.plist)
 cd swift && make clean
@@ -43,11 +43,11 @@ Two-way bridging gotcha: `Audio.h` includes `Tuner-Swift.h`, which `swiftc` gene
 
 `Audio.swift` is an unfinished Swift port of `Audio.m`. It is not in the Makefile's `SOURCES` and does not compile; ignore it unless you are deliberately continuing that port.
 
-The Makefile copies Swift runtime dylibs from a hard-coded Xcode path (`XCODELIB`, swift-5.0) into `Frameworks/`. If the build fails looking for that directory, update `XCODELIB` in `swift/Makefile` for the installed Xcode.
+The app links against the Swift runtime that ships with macOS and nothing is bundled, so the Command Line Tools are enough to build it; no Xcode install is needed.
 
 ## Conventions
 
-- Version lives in `swift/Info.plist` (`CFBundleShortVersionString`); the CI workflow hard-codes the matching DMG filename (`Tuner-<version>.dmg`) in `.github/workflows/build.yml`, so bump both together.
+- Version lives in `swift/Info.plist` (`CFBundleShortVersionString`); `make dmg` names the DMG from it and CI uploads whichever DMG that produces.
 - Keyboard shortcuts and click actions per view are documented in `swift/README.md`; keep them in sync with `keyDown`/`mouseDown` handlers when changing behaviour.
 - Build artifacts (`*.app`, `*.dmg`, `*.o`) are gitignored; `.gitignore` also ignores all dotfiles, so new dot-directories need an explicit `!` entry.
 - After a solved, verified problem, automatically invoke the `ce-compound` skill with `mode:non-interactive` at the completion checkpoint only when the work produced durable project reasoning that is not readily recoverable from the final code, tests, types, comments, or existing documentation, and losing it would plausibly cause recurrence, material risk, or substantial rediscovery. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not invoke it. Completion, effort, and diff size alone are not enough. Capture at the checkpoint so a qualifying learning can ship in the PR that produced it, and only where the repository treats captured learnings as tracked, committed knowledge.
