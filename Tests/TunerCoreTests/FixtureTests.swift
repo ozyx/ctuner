@@ -27,10 +27,10 @@ struct FixtureTests
 {
     @Test func fixturesPresent()
     {
-        #expect(Fixture.all().count >= 28)
+        #expect(Fixture.all.count >= 28)
     }
 
-    @Test(arguments: Fixture.all())
+    @Test(arguments: Fixture.all)
     func inputMatchesHeader(fixture: Fixture) throws
     {
         let header = try fixture.header()
@@ -46,7 +46,7 @@ struct FixtureTests
     // The measured frequency is within the header's bound of the
     // analytic frequency on every found hop after warm-up, and every hop
     // after warm-up is found
-    @Test(arguments: Fixture.all().filter
+    @Test(arguments: Fixture.all.filter
           {
               (try? $0.header()["expect_hz"]) != nil
           })

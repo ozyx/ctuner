@@ -57,8 +57,8 @@ struct Fixture: CustomTestStringConvertible, Sendable
 
     var testDescription: String { name }
 
-    // all
-    static func all() -> [Fixture]
+    // Every committed fixture, listed once
+    static let all: [Fixture] =
     {
         guard let directory = Bundle.module.url(forResource: "Fixtures",
                                                 withExtension: nil)
@@ -74,12 +74,12 @@ struct Fixture: CustomTestStringConvertible, Sendable
             .map { Fixture(name: String($0.dropLast(".header".count)),
                            directory: directory) }
             .sorted { $0.name < $1.name }
-    }
+    }()
 
     // named
     static func named(_ name: String) -> Fixture?
     {
-        return all().first { $0.name == name }
+        return all.first { $0.name == name }
     }
 
     // header
@@ -139,8 +139,10 @@ extension ExpectedHop
     // init(line:)
     init(line: String) throws
     {
+        // hop to sumsq, then the digest bins, then three per maximum
+        let scalarFields = 10
         let fields = line.split(separator: " ").map(String.init)
-        let fixed = 10 + 2 * Fixture.digestHalf + 1
+        let fixed = scalarFields + 2 * Fixture.digestHalf + 1
 
         guard fields.count >= fixed
         else
@@ -178,7 +180,7 @@ extension ExpectedHop
         max = try double(7)
         imax = try int(8)
         sumsq = try double(9)
-        bins = try (10 ..< fixed).map { try double($0) }
+        bins = try (scalarFields ..< fixed).map { try double($0) }
 
         guard fields.count == fixed + 3 * count
         else
@@ -200,13 +202,16 @@ extension ExpectedHop
 // fnv1a64
 func fnv1a64(_ data: Data) -> UInt64
 {
-    var hash: UInt64 = 0xCBF29CE484222325
-
-    for byte in data
+    return data.withUnsafeBytes
     {
-        hash ^= UInt64(byte)
-        hash = hash &* 0x100000001B3
-    }
+        var hash: UInt64 = 0xCBF29CE484222325
 
-    return hash
+        for byte in $0
+        {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001B3
+        }
+
+        return hash
+    }
 }

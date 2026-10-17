@@ -57,13 +57,13 @@ do
     expected="$FIX/$name.expected.txt"
 
     # found, note and count in every build
-    for build in ref-O0 ref-O3 ref-nocontract
+    for variant in ref-O0 ref-O3 ref-nocontract
     do
-        "$WORK/$build" "$header" "$input" > "$WORK/$name.$build.txt"
+        "$WORK/$variant" "$header" "$input" > "$WORK/$name.$variant.txt"
         if ! cmp -s <(cut -d' ' -f1-4 "$expected") \
-                    <(cut -d' ' -f1-4 "$WORK/$name.$build.txt")
+                    <(cut -d' ' -f1-4 "$WORK/$name.$variant.txt")
         then
-            echo "UNSTABLE $name: found, note or count differs in $build"
+            echo "UNSTABLE $name: found, note or count differs in $variant"
             failed=1
         fi
     done

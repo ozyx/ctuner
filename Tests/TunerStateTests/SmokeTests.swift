@@ -19,7 +19,7 @@ import Testing
 import TunerCore
 import TunerState
 
-@Suite("smoke")
+@Suite("state smoke")
 struct StateSmokeTests
 {
     @Test func statusText()

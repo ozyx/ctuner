@@ -57,8 +57,9 @@ enum
 @implementation MeterView
 @end
 
-// The next block AudioUnitRender hands to InputProc
+// The next block AudioUnitRender hands to InputProc, and its hop
 static Float32 *nextBlock;
+static long currentHop;
 
 // AudioUnitRender, replacing AudioToolbox's for the frozen InputProc
 OSStatus AudioUnitRender(AudioUnit unit, AudioUnitRenderActionFlags *flags,
@@ -71,8 +72,6 @@ OSStatus AudioUnitRender(AudioUnit unit, AudioUnitRenderActionFlags *flags,
 
     return noErr;
 }
-
-static long currentHop;
 
 // printDouble
 static void printDouble(double value)
@@ -140,8 +139,18 @@ static int readHeader(const char *path, Header *header)
         return -1;
     }
 
-    *header = (Header){44100.0, 440.0, 0, -1, kEqual, 0, 0, 0, 0, 0,
-        0xfff, 0x1ff};
+    // The defaults in the fixtures README
+    *header = (Header)
+    {
+        .rate = 44100.0,
+        .reference = 440.0,
+        .hops = 0,
+        .toggle = -1,
+        .temper = kEqual,
+        .key = 0,
+        .notes = 0xfff,
+        .octaves = 0x1ff
+    };
 
     char key[64];
     char value[256];
