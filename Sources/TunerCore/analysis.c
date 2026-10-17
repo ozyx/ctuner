@@ -204,6 +204,11 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
             maxima[count].n  = 0;
         }
 
+        // A bin with no positive frequency estimate is not a note; today's
+        // engine converted its infinite or NaN cents to int
+        if (!(xf[i] > 0.0))
+            continue;
+
         // Cents relative to reference
         double cf = -12.0 * log2(e->reference / xf[i]);
         int note = round(cf) + kC5Offset;
@@ -285,29 +290,22 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
     double c = 0.0;
 
     // Do the note and cents calculations
-    if (max > kMin)
+    // Frequency
+    if (max > kMin && !e->downsample)
+        f = maxima[0].f;
+
+    // No candidate: today's engine went on to convert infinite or NaN
+    // cents to int and index before a temperament row; only a positive
+    // frequency on a non-negative note reaches the calculations
+    double cf = (max > kMin && f > 0.0)?
+        -12.0 * log2(e->reference / f): 0.0;
+
+    if (max > kMin && f > 0.0 && round(cf) + kC5Offset >= 0)
     {
         found = true;
 
-        // Frequency
-        if (!e->downsample)
-            f = maxima[0].f;
-
-        // Cents relative to reference
-        double cf = -12.0 * log2(e->reference / f);
-
-        // Don't count silly values
-        if (isnan(cf))
-        {
-            cf = 0.0;
-            found = false;
-        }
-
         // Note number
         note = round(cf) + kC5Offset;
-
-        if (note < 0)
-            found = false;
 
         // Octave note number
         int n = (note - e->key + kOctave) % kOctave;
