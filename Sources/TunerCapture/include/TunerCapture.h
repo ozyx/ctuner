@@ -91,6 +91,31 @@ CaptureStatus CaptureGetStatus(Capture *capture);
 // The device's sample rate, read at create
 double CaptureSampleRate(Capture *capture);
 
+// Stage 2 capture: AVAudioEngine and a sink node on the default input
+// at the device's own rate, which is never changed. The engine lives
+// as long as the handle; each start attaches a new sink and each stop
+// detaches it. The blocks are formed here, never in Swift.
+
+typedef struct CaptureEngine CaptureEngine;
+
+// Called when the engine's configuration changes, on the thread that
+// posts the notification; it must not destroy the handle
+typedef void (*CaptureChange)(void *context);
+
+// Create the engine and observe its configuration changes
+CaptureStatus CaptureEngineCreate(CaptureChange change, void *context,
+                                  CaptureEngine **engine);
+void CaptureEngineDestroy(CaptureEngine *engine);
+
+// The default input's sample rate, or 0 when there is no input device
+double CaptureEngineInputRate(CaptureEngine *engine);
+
+// Attach a sink at the input's format that pushes channel 0 of each
+// block, and start the engine; stop stops it and detaches the sink
+CaptureStatus CaptureEngineStart(CaptureEngine *engine, CapturePush push,
+                                 void *context);
+void CaptureEngineStop(CaptureEngine *engine);
+
 #ifdef __cplusplus
 }
 #endif
