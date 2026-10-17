@@ -93,6 +93,12 @@ void TunerEngineSetReference(TunerEngine *engine, double reference)
 // TunerEngineSetTemperament
 void TunerEngineSetTemperament(TunerEngine *engine, int temperament)
 {
+    // Clamp, so a bad saved index cannot read outside the table
+    if (temperament < 0)
+        temperament = 0;
+    if (temperament >= kTunerTemperaments)
+        temperament = kTunerTemperaments - 1;
+
     engine->temperament = temperament;
 }
 
