@@ -173,8 +173,11 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
             xa[i] *= (i < Length(e->x4))? e->x4[i]: 0.0;
             xa[i] *= (i < Length(e->x5))? e->x5[i]: 0.0;
 
-            // Calculate differences for finding maxima
-            dxa[i] = xa[i] - xa[i - 1];
+            // Calculate differences for finding maxima; there is none
+            // for bin 0, which today's engine read from before the
+            // spectrum, and the search never uses it
+            if (i > 0)
+                dxa[i] = xa[i] - xa[i - 1];
         }
     }
 
