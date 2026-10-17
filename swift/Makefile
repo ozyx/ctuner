@@ -42,10 +42,11 @@ SOURCES = AppDelegate.swift ScopeView.swift SpectrumView.swift \
 	StrobeView.swift DisplayView.swift MeterView.swift \
 	StaffView.swift TunerView.swift main.swift
 
-SFLAGS = -target arm64-apple-macos14 -swift-version 5 -module-name Tuner \
+# Optimised, so the stage 1 baseline measures a fair build
+SFLAGS = -O -target arm64-apple-macos14 -swift-version 5 -module-name Tuner \
 	-import-objc-header $(HEADER) -emit-objc-header-path $(SWIFTH)
 
-CFLAGS = -target arm64-apple-macos14
+CFLAGS = -O2 -target arm64-apple-macos14
 
 $(APPBUNDLE): $(APPNAME) $(APPNAME).icns Info.plist PkgInfo $(APPNAME).entitlements
 	$(RM) -rf $(APPBUNDLE)
