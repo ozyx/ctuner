@@ -96,7 +96,7 @@ public struct CaptureError: Error, Sendable
     public let message: String
 
     // init
-    public init(_ status: CaptureStatus)
+    init(_ status: CaptureStatus)
     {
         message = String(cString: CaptureStatusString(status))
     }
@@ -288,7 +288,7 @@ public final class CaptureController
 
         catch
         {
-            state = .failed(error.message)
+            fail(error.message)
             return
         }
 
@@ -318,8 +318,7 @@ public final class CaptureController
 
         catch
         {
-            stopCapture()
-            state = .failed(error.message)
+            fail(error.message)
             return
         }
 
@@ -330,12 +329,18 @@ public final class CaptureController
 
         catch
         {
-            stopCapture()
-            state = .failed(error.message)
+            fail(error.message)
             return
         }
 
         state = .running(rate)
+    }
+
+    // fail: stop whatever started and show why
+    private func fail(_ message: String)
+    {
+        stopCapture()
+        state = .failed(message)
     }
 
     // stopCapture: the input, then the core; the display goes blank
@@ -445,14 +450,9 @@ public final class EngineBackend: CaptureBackend
     public func requestPermission(_ done: @escaping @MainActor (Bool)
                                     -> Void)
     {
-        AVAudioApplication.requestRecordPermission
+        Task
         {
-            granted in
-            Task
-            {
-                @MainActor in
-                done(granted)
-            }
+            done(await AVAudioApplication.requestRecordPermission())
         }
     }
 

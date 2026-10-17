@@ -292,6 +292,25 @@ struct CaptureControllerTests
         #expect(rig.backend.running === rig.controller.engine)
     }
 
+    @Test func hidingAgainStartsTheDebounceAgain()
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        rig.controller.activate()
+
+        // Hidden, shown, hidden again: the first hide's timer must not
+        // stop capture before the second hide's debounce has run
+        rig.controller.setVisible(false)
+        rig.clock.advance(CaptureController.pauseAfter / 2)
+        rig.controller.setVisible(true)
+        rig.controller.setVisible(false)
+        rig.clock.advance(CaptureController.pauseAfter * 3 / 4)
+        #expect(rig.controller.state == .running(44100))
+
+        rig.clock.advance(CaptureController.pauseAfter / 4)
+        #expect(rig.controller.state == .stopped)
+    }
+
     @Test func noRestartWhileHidden()
     {
         let rig = Rig()

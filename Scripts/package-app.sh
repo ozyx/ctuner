@@ -10,9 +10,9 @@
 #
 #  usage: Scripts/package-app.sh EXECUTABLE OUTDIR [BUNDLE...]
 #
-#  BUNDLE names a resource bundle in the executable's directory, such
-#  as Tuner_TunerUI.bundle. Only the named ones are copied, because the
-#  release directory also holds the test bundles.
+#  BUNDLE names a resource bundle in the executable's directory. Only
+#  the named ones are copied, because the release directory also holds
+#  the test bundles.
 
 set -eu
 

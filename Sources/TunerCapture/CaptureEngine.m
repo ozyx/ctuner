@@ -58,8 +58,8 @@ struct CaptureEngine
     CFTypeRef observer;
 };
 
-// Engine
-static AVAudioEngine *Engine(CaptureEngine *engine)
+// AudioEngine
+static AVAudioEngine *AudioEngine(CaptureEngine *engine)
 {
     return (__bridge AVAudioEngine *)engine->engine;
 }
@@ -106,27 +106,27 @@ CaptureStatus CaptureEngineCreate(CaptureChange change, void *context,
     if (!change || engine == NULL)
         return kCaptureStatusBadArgument;
 
-    CaptureEngine *e = calloc(1, sizeof(CaptureEngine));
-    if (e == NULL)
+    CaptureEngine *capture = calloc(1, sizeof(CaptureEngine));
+    if (capture == NULL)
         return kCaptureStatusNoMemory;
 
-    e->engine = Adopt([AVAudioEngine new]);
+    capture->engine = Adopt([AVAudioEngine new]);
 
     // The handler only reports the change; the owner stops and
     // restarts later, never inside it
     id observer =
         [NSNotificationCenter.defaultCenter
             addObserverForName:AVAudioEngineConfigurationChangeNotification
-                        object:Engine(e)
+                        object:AudioEngine(capture)
                          queue:nil
                     usingBlock:^(NSNotification *notification)
          {
              (void)notification;
              change(context);
          }];
-    e->observer = CFBridgingRetain(observer);
+    capture->observer = CFBridgingRetain(observer);
 
-    *engine = e;
+    *engine = capture;
     return kCaptureStatusOK;
 }
 
@@ -148,7 +148,7 @@ void CaptureEngineDestroy(CaptureEngine *engine)
 // CaptureEngineInputRate
 double CaptureEngineInputRate(CaptureEngine *engine)
 {
-    return [Engine(engine).inputNode inputFormatForBus:0].sampleRate;
+    return [AudioEngine(engine).inputNode inputFormatForBus:0].sampleRate;
 }
 
 // CaptureEngineStart
@@ -159,8 +159,8 @@ CaptureStatus CaptureEngineStart(CaptureEngine *engine, CapturePush push,
         return kCaptureStatusBadArgument;
 
     // The sink does no conversion, so it takes the input's own format
-    AVAudioEngine *e = Engine(engine);
-    AVAudioInputNode *input = e.inputNode;
+    AVAudioEngine *audio = AudioEngine(engine);
+    AVAudioInputNode *input = audio.inputNode;
     AVAudioFormat *format = [input outputFormatForBus:0];
     if (format.sampleRate <= 0)
         return kCaptureStatusNoInputDevice;
@@ -168,11 +168,11 @@ CaptureStatus CaptureEngineStart(CaptureEngine *engine, CapturePush push,
     engine->sink = Sink(push, context);
     AVAudioSinkNode *sink = (__bridge AVAudioSinkNode *)engine->sink;
 
-    [e attachNode:sink];
-    [e connect:input to:sink format:format];
-    [e prepare];
+    [audio attachNode:sink];
+    [audio connect:input to:sink format:format];
+    [audio prepare];
 
-    if (![e startAndReturnError:nil])
+    if (![audio startAndReturnError:nil])
     {
         CaptureEngineStop(engine);
         return kCaptureStatusStart;
@@ -187,12 +187,12 @@ void CaptureEngineStop(CaptureEngine *engine)
     if (engine == NULL)
         return;
 
-    AVAudioEngine *e = Engine(engine);
-    [e stop];
+    AVAudioEngine *audio = AudioEngine(engine);
+    [audio stop];
 
     if (engine->sink != NULL)
     {
-        [e detachNode:(__bridge AVAudioSinkNode *)engine->sink];
+        [audio detachNode:(__bridge AVAudioSinkNode *)engine->sink];
         CFRelease(engine->sink);
         engine->sink = NULL;
     }
