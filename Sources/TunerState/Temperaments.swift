@@ -298,4 +298,12 @@ public enum Temperaments
     {
         return values.flatMap { $0 }
     }
+
+    // ratios: one row as ratios from C, whether it is written in
+    // ratios or in Hz
+    public static func ratios(_ row: Int) -> [Double]
+    {
+        let first = values[row][0]
+        return values[row].map { $0 / first }
+    }
 }
