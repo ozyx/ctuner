@@ -25,11 +25,11 @@ make test-release           # swift test, release (the shipped optimisation leve
 make sanitize               # address+undefined, then thread
 make core-check             # the core warning-free under -Wall -Wextra, no Cocoa/ObjC/logging symbols
 make core-leaks             # the engine's start/stop/destroy lifecycle 100 times under leaks
-make build                  # release build of every product, the app's TunerAppKit included
+make build                  # release build of every product, the app's Tuner product included
 make fixtures               # rewrite the golden fixtures from the frozen engine
 make fixture-screen         # check every fixture holds across builds and sanitizers
 
-# macOS (Swift app) — swift build -c release --product TunerAppKit at the
+# macOS (Swift app) — swift build -c release --product Tuner at the
 # repo root, then bundles that binary as Tuner.app
 cd swift && make            # Tuner.app
 cd swift && make dmg        # Tuner-<version>.dmg (version read from Info.plist)

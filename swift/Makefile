@@ -31,10 +31,11 @@ APPBUNDLEICON = $(APPBUNDLECONTENTS)/Resources
 APPDMG = $(APPNAME).dmg
 APPVDMG = $(APPNAME)-$(APPVERSION).dmg
 
-# The app is the TunerAppKit product of the package at the repo root,
-# built in release, so the shipped objects are the tested ones
+# The app is the Tuner product (the TunerAppKit target) of the package
+# at the repo root, built in release, so the shipped objects are the
+# tested ones
 PACKAGE = ..
-PRODUCT = TunerAppKit
+PRODUCT = Tuner
 BINPATH = $(PACKAGE)/.build/release
 
 $(APPBUNDLE): $(APPNAME) $(APPNAME).icns Info.plist PkgInfo $(APPNAME).entitlements

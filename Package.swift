@@ -31,7 +31,9 @@ let package = Package(
         .library(name: "TunerState", targets: ["TunerState"]),
         .executable(name: "GoldenGenerator", targets: ["GoldenGenerator"]),
         .executable(name: "GoldenReference", targets: ["GoldenReference"]),
-        .executable(name: "TunerAppKit", targets: ["TunerAppKit"]),
+        // Named Tuner so the linker signs the binary with today's
+        // identifier, which the microphone grant is tied to
+        .executable(name: "Tuner", targets: ["TunerAppKit"]),
     ],
     targets: [
         // The analysis engine: plain C on Accelerate, no Cocoa
