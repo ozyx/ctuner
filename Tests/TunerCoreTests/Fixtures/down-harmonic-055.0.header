@@ -1,0 +1,9 @@
+name down-harmonic-055.0
+down 1
+expect_hz 55
+expect_cents 3
+signal --harmonic 55:0.5:5
+hops 64
+block 1024
+input_bytes 262144
+input_hash 73fdf342bd517eca

@@ -1,0 +1,7 @@
+name down-sine-0440
+down 1
+signal --tone 440:0.5:0
+hops 64
+block 1024
+input_bytes 262144
+input_hash fb39aeb3f37eec8b

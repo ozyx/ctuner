@@ -1,0 +1,6 @@
+name pair-440-442
+signal --tone 440:0.3:0 --tone 442:0.3:1
+hops 64
+block 1024
+input_bytes 262144
+input_hash e8be9d96a87141c2

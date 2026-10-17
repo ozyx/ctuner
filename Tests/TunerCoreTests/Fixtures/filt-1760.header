@@ -1,0 +1,8 @@
+name filt-1760
+filt 1
+expect_hz 1760
+signal --tone 1760:0.5:0
+hops 64
+block 1024
+input_bytes 262144
+input_hash 210fc0460a8e4911

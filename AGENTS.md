@@ -24,6 +24,8 @@ make test                   # swift test, debug
 make test-release           # swift test, release (the shipped optimisation level)
 make sanitize               # address+undefined, then thread
 make build                  # release build of every product
+make fixtures               # rewrite the golden fixtures from the frozen engine
+make fixture-screen         # check every fixture holds across builds and sanitizers
 
 # macOS (Swift app) — builds an arm64 binary and Tuner.app
 cd swift && make            # Tuner.app
@@ -33,6 +35,8 @@ cd swift && make clean
 # Linux
 cd linux && make            # needs libgtk-3-dev libasound2-dev
 ```
+
+Golden fixtures: `Tests/TunerCoreTests/Fixtures/` holds committed inputs and the per-hop output of a frozen copy of today's engine (`Sources/GoldenReference/Reference/`, unmodified except one hook line). Never edit the frozen copy to match a change in the new core; the fixtures are what the new core is judged against. Their format and the known sanitizer reports are in that directory's `README.md`.
 
 Package notes: on the Command Line Tools, `swift test` finds the Swift Testing macro plugin only about half the time, so the root `Makefile` adds `-plugin-path` for it when `xcode-select -p` is the Command Line Tools and leaves it out on an Xcode toolchain such as CI's. Run tests through `make`, not bare `swift test`. No target may use `unsafeFlags`; compiler policy goes in pragmas and attributes in source, so the library products stay usable as dependencies.
 

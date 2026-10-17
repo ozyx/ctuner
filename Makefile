@@ -17,7 +17,10 @@ CLT = /Library/Developer/CommandLineTools
 TESTINGPLUGIN = $(if $(filter $(CLT),$(shell xcode-select -p 2>/dev/null)),\
 	-Xswiftc -plugin-path -Xswiftc $(CLT)/usr/lib/swift/host/plugins/testing)
 
-.PHONY: build test test-release sanitize clean
+FIXTURES = Tests/TunerCoreTests/Fixtures
+BIN = .build/release
+
+.PHONY: build test test-release sanitize fixtures fixture-screen clean
 
 build:
 	$(SWIFT) build -c release
@@ -33,6 +36,18 @@ test-release:
 sanitize:
 	$(SWIFT) test --sanitize=address --sanitize=undefined $(TESTINGPLUGIN)
 	$(SWIFT) test --sanitize=thread $(TESTINGPLUGIN)
+
+# Write every golden fixture from the frozen reference engine; a second
+# run must leave the fixture files unchanged
+fixtures:
+	$(SWIFT) build -c release --product GoldenGenerator
+	$(SWIFT) build -c release --product GoldenReference
+	Scripts/fixtures.sh $(BIN)/GoldenGenerator $(BIN)/GoldenReference $(FIXTURES)
+
+# Rebuild the reference at other optimisation levels and under the
+# sanitizers, and check that every fixture holds
+fixture-screen:
+	Scripts/fixture-screen.sh $(FIXTURES) .build/fixture-screen
 
 clean:
 	$(SWIFT) package clean

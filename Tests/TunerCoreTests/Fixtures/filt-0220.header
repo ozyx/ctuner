@@ -1,0 +1,8 @@
+name filt-0220
+filt 1
+expect_hz 220
+signal --tone 220:0.5:0
+hops 64
+block 1024
+input_bytes 262144
+input_hash 09d8d446c5078668

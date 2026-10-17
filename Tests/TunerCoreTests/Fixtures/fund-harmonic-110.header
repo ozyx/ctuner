@@ -1,0 +1,7 @@
+name fund-harmonic-110
+fund 1
+signal --harmonic 110:0.5:5
+hops 64
+block 1024
+input_bytes 262144
+input_hash 5a20df21f7c7a43d

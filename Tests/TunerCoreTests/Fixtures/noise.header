@@ -1,0 +1,6 @@
+name noise
+signal --noise 0.5:12345
+hops 64
+block 1024
+input_bytes 262144
+input_hash 49ed96a24665e0f6

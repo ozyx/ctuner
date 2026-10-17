@@ -1,0 +1,8 @@
+name temper-kirnberger3-g
+temper 1
+key 7
+signal --tone 440:0.5:0
+hops 64
+block 1024
+input_bytes 262144
+input_hash fb39aeb3f37eec8b
