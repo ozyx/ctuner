@@ -16,9 +16,15 @@ A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent
 
 ## Build commands
 
-Everything is plain `make`; no tests exist in the repo.
+Everything is plain `make`. The Swift package at the repo root holds the new analysis core, its capture layer, the platform-free state layer and their tests; the root `Makefile` wraps it.
 
 ```sh
+# Swift package (repo root) — Command Line Tools are enough
+make test                   # swift test, debug
+make test-release           # swift test, release (the shipped optimisation level)
+make sanitize               # address+undefined, then thread
+make build                  # release build of every product
+
 # macOS (Swift app) — builds an arm64 binary and Tuner.app
 cd swift && make            # Tuner.app
 cd swift && make dmg        # Tuner-<version>.dmg (version read from Info.plist)
@@ -27,6 +33,8 @@ cd swift && make clean
 # Linux
 cd linux && make            # needs libgtk-3-dev libasound2-dev
 ```
+
+Package notes: on the Command Line Tools, `swift test` finds the Swift Testing macro plugin only about half the time, so the root `Makefile` adds `-plugin-path` for it when `xcode-select -p` is the Command Line Tools and leaves it out on an Xcode toolchain such as CI's. Run tests through `make`, not bare `swift test`. No target may use `unsafeFlags`; compiler policy goes in pragmas and attributes in source, so the library products stay usable as dependencies.
 
 Linux notes: use the plain `Makefile`, not autoconf. Running `./configure` overwrites `Makefile` with one that doesn't work; `Makefile.de` is the backup.
 
