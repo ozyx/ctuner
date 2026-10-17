@@ -20,18 +20,10 @@
 
 
 import Cocoa
+import TunerState
 
 class DisplayView: TunerView
 {
-    @objc var lock = false
-    @objc var mult = false
-    @objc var trans = 0
-    @objc var n = 0
-    @objc var c = 0.0
-    @objc var f = 0.0
-    @objc var fr = 0.0
-    @objc var stale = false
-
     let kTextSize: CGFloat = 12
 
     // mouseDown
@@ -39,10 +31,10 @@ class DisplayView: TunerView
     {
         if (event.type == .leftMouseDown)
         {
-            lock = !lock
+            model.isLocked = !model.isLocked
             if (lockBox != nil)
             {
-                lockBox.state = lock ? .on: .off
+                lockBox.state = model.isLocked ? .on: .off
             }
             needsDisplay = true
         }
@@ -62,7 +54,11 @@ class DisplayView: TunerView
         // Drawing code here.
         NSEraseRect(rect)
 
-        if (mult)
+        // The held or live reading, none until the first note
+        let reading = model.reading
+        let stale = model.isStale
+
+        if (settings.multiple), let reading
         {
 	    // Select font
             let font = NSFont.systemFont(ofSize: textSizeSmall)
@@ -72,16 +68,18 @@ class DisplayView: TunerView
             var x = rect.minX + 2
             var y = rect.maxY - textSizeSmall - 2
 
+            // The rows clear when the reading goes stale
+            let reeds = stale ? [] : reading.reeds
+
             // No data, probably
-	    if (disp.count == 0)
+	    if (reeds.count == 0)
 	    {
+                let c = reading.cents / 100
+                let f = reading.frequency
+                let fr = reading.reference
+
 	        // Display note
-                s = String(format: "%@%@%d",
-                           notes[(n - translate[trans] +
-                                    kOctave) % notes.endIndex],
-		           sharps[(n - translate[trans] +
-                                     kOctave) % sharps.endIndex],
-                                  n / kOctave)
+                s = reading.displayNote(transpose: settings.transpose).text
                 s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
                 x += s.size(withAttributes: attribs).width +
                   "  ".size(withAttributes: attribs).width
@@ -109,39 +107,21 @@ class DisplayView: TunerView
                 s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
             }
 
-            for i in 0 ..< Int(disp.count)
+            // The reeds skip a maximum with no note or silly cents
+            for reed in reeds
             {
                 // Actual freq
-	        let f = disp.maxima[i].f
+	        let f = reed.frequency
 
 	        // Reference freq
-	        let fr = disp.maxima[i].fr
-
-                // Note number
-	        let n = Int(disp.maxima[i].n)
-
-                // Ignore negative
-	        if (n < 0)
-                {
-		    continue
-                }
+	        let fr = reed.reference
 
                 // Cents
-	        let c = -12.0 * log2(fr / f)
-
-	        // Ignore silly values
-	        if (!c.isFinite)
-                {
-		    continue
-                }
+	        let c = reed.cents / 100
 
 	        // Display note
-	        s = String(format: "%@%@%d",
-                           notes[(n - translate[trans] +
-                                    kOctave) % notes.endIndex],
-		           sharps[(n - translate[trans] +
-                                     kOctave) % sharps.endIndex],
-                           n / kOctave)
+	        s = DisplayNote(note: reed.note,
+                                transpose: settings.transpose).text
                 s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
                 x += s.size(withAttributes: attribs).width +
                   "  ".size(withAttributes: attribs).width
@@ -172,8 +152,12 @@ class DisplayView: TunerView
         }
 
         // Leave the display blank until the first note
-        else if (f > 0)
+        else if let reading
         {
+            let shown = reading.displayNote(transpose: settings.transpose)
+            let f = reading.frequency
+            let fr = reading.reference
+
             var s = ""
             var x = rect.minX + 2
             var y = rect.maxY - textSizeLarger - 2
@@ -182,9 +166,7 @@ class DisplayView: TunerView
             var font = NSFont.boldSystemFont(ofSize: textSizeLarger)
             var attribs: [NSAttributedString.Key: Any] = [.font: font]
 
-	    s = String(format: "%@",
-                       notes[Int(n - translate[trans] +
-                                   kOctave) % notes.endIndex])
+	    s = shown.name
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
             x += s.size(withAttributes: attribs).width
 
@@ -192,7 +174,7 @@ class DisplayView: TunerView
             font = NSFont.boldSystemFont(ofSize: textSizeLarger / 2)
             attribs = [.font: font]
 
-	    s = String(format: "%d", n / kOctave) 
+	    s = String(format: "%d", shown.octave)
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
             var noteRight = x + s.size(withAttributes: attribs).width
 
@@ -200,9 +182,7 @@ class DisplayView: TunerView
             font = NSFont.boldSystemFont(ofSize: textSizeLarger / 2)
             attribs = [.font: font]
 
-	    s = String(format: "%@",
-                       sharps[Int(n - translate[trans] +
-                                    kOctave) % sharps.endIndex])
+	    s = shown.symbol
             s.draw(at: NSMakePoint(x, y + textSizeLarger / 2),
                    withAttributes: attribs)
             noteRight = max(noteRight, x + s.size(withAttributes: attribs).width)
@@ -255,8 +235,7 @@ class DisplayView: TunerView
 	    y -= textSizeMedium
             x = rect.minX + 2
 
-	    s = String(format: "A4 = %.2f Hz", (audio.reference == 0) ?
-		    kA5Reference : audio.reference)
+	    s = String(format: "A4 = %.2f Hz", settings.reference)
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
         }
 
@@ -268,7 +247,7 @@ class DisplayView: TunerView
         }
 
         // Display L if locked
-        if (lock == true)
+        if (model.isLocked)
         {
             let font = NSFont.boldSystemFont(ofSize: kTextSize)
             let attribs: [NSAttributedString.Key: Any] = [.font: font]

@@ -31,6 +31,9 @@ let package = Package(
         .library(name: "TunerState", targets: ["TunerState"]),
         .executable(name: "GoldenGenerator", targets: ["GoldenGenerator"]),
         .executable(name: "GoldenReference", targets: ["GoldenReference"]),
+        // Named Tuner so the linker signs the binary with today's
+        // identifier, which the microphone grant is tied to
+        .executable(name: "Tuner", targets: ["TunerAppKit"]),
     ],
     targets: [
         // The analysis engine: plain C on Accelerate, no Cocoa
@@ -53,6 +56,34 @@ let package = Package(
         .target(
             name: "TunerState",
             dependencies: ["TunerCore", "TunerCapture"]),
+
+        // Stage 1: today's AppKit window on the new core. swift/Makefile
+        // copies this binary into Tuner.app.
+        .executableTarget(
+            name: "TunerAppKit",
+            dependencies: ["TunerCore", "TunerCapture", "TunerState"],
+            path: "swift",
+            exclude: [
+                "Info.plist",
+                "Makefile",
+                "PkgInfo",
+                "README",
+                "README.md",
+                "Tuner.entitlements",
+                "Tuner.png",
+            ],
+            sources: [
+                "AppDelegate.swift",
+                "DisplayView.swift",
+                "MeterView.swift",
+                "ScopeView.swift",
+                "SpectrumView.swift",
+                "StaffView.swift",
+                "StrobeView.swift",
+                "TunerView.swift",
+                "main.swift",
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]),
 
         // Writes deterministic float32 fixture inputs
         .executableTarget(name: "GoldenGenerator"),

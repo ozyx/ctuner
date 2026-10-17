@@ -19,31 +19,54 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Cocoa
+import TunerState
 
 let kMaxExpand = 16
 let kMinExpand = 1
 
 class SpectrumView: TunerView
 {
-    @objc var zoom = true
-    @objc var expand = 1
-    @objc var f = 0.0
-    @objc var l = 0.0
-    @objc var h = 0.0
-    @objc var r = 0.0
-
     let kTextSize = CGFloat(10)
     var max = 0.0
+
+    // The spectrum and its markers, copied from a snapshot and the
+    // display model when the traces refresh
+    var data: [Double] = []
+    var markers: Markers?
+    var binWidth = 1.0
+
+    // update: copy the spectrum and markers and redraw; the snapshot's
+    // buffer is reused after the next acquire, so nothing keeps it
+    func update(_ spectrum: UnsafeBufferPointer<Double>, binWidth: Double,
+                markers: Markers?)
+    {
+        if (data.count != spectrum.count)
+        {
+            data = Array(spectrum)
+        }
+
+        else
+        {
+            _ = data.withUnsafeMutableBufferPointer
+            {
+                $0.update(fromContentsOf: spectrum)
+            }
+        }
+
+        self.binWidth = binWidth
+        self.markers = markers
+        needsDisplay = true
+    }
 
     // mouseDown
     override func mouseDown(with event: NSEvent)
     {
         if (event.type == .leftMouseDown)
         {
-            zoom = !zoom
+            settings.zoom = !settings.zoom
             if (zoomBox != nil)
             {
-                zoomBox.state = zoom ? .on: .off
+                zoomBox.state = settings.zoom ? .on: .off
             }
             needsDisplay = true
         }
@@ -74,10 +97,19 @@ class SpectrumView: TunerView
                                     to: NSMakePoint(rect.maxX, y))
         }
 
-        if (spectrum.data == nil)
+        if (data.isEmpty)
         {
             return
         }
+
+        // The markers in bins, none after a reading goes stale
+        let l = (markers?.lower ?? 0) / binWidth
+        let h = (markers?.upper ?? 0) / binWidth
+        let r = (markers?.reference ?? 0) / binWidth
+        let reeds = markers?.reeds ?? []
+        let values = reeds.map { $0.frequency / binWidth }
+        let zoom = settings.zoom
+        let expand = settings.expand
 
         if (width < 1)
         {
@@ -116,9 +148,9 @@ class SpectrumView: TunerView
 	    // Draw trace
 	    for i in Int(floor(l)) ... Int(ceil(h))
 	    {
-	        if (i > 0 && i < spectrum.length)
+	        if (i > 0 && i < data.count)
 	        {
-		    let value = spectrum.data[i]
+		    let value = data[i]
 
 		    if (max < value)
                     {
@@ -150,13 +182,13 @@ class SpectrumView: TunerView
             context.shouldAntialias = false;
 
 	    // Draw line for nearest frequency
-	    for i in 0 ..< Int(spectrum.count)
+	    for i in 0 ..< values.count
 	    {
 	        // Draw line for values that are in range
-	        if (spectrum.values[i] > l && spectrum.values[i] < h)
+	        if (values[i] > l && values[i] < h)
 	        {
 		    let x = rect.minX +
-                      CGFloat((spectrum.values[i] - l) * xscale)
+                      CGFloat((values[i] - l) * xscale)
 		    NSBezierPath.strokeLine(from: NSMakePoint(x, rect.minY),
 		                            to: NSMakePoint(x, rect.maxY))
 	        }
@@ -168,27 +200,16 @@ class SpectrumView: TunerView
               [.foregroundColor: NSColor.yellow, .font: font]
             context.shouldAntialias = true;
 
-	    for i in 0 ..< Int(spectrum.count)
+	    for i in 0 ..< values.count
 	    {
 	        // Show value for values that are in range
 
-	        if (spectrum.values[i] > l && spectrum.values[i] < h)
+	        if (values[i] > l && values[i] < h)
 	        {
-		    let f = disp.maxima[i].f
-
-		    // Reference freq
-		    let fr = disp.maxima[i].fr
-
-		    let c = -12.0 * log2(fr / f)
-
-		    // Ignore silly values
-		    if (!c.isFinite)
-                    {
-		        continue
-                    }
+		    let c = reeds[i].cents / 100
 
 		    let x = rect.minX +
-                      CGFloat((spectrum.values[i] - l) * xscale)
+                      CGFloat((values[i] - l) * xscale)
 
 		    let s = String(format: "%+0.0f", c * 100.0)
 		    s.draw(at: NSMakePoint(x, rect.minY - 2),
@@ -203,7 +224,7 @@ class SpectrumView: TunerView
             context.shouldAntialias = true;
 
             // Scale
-	    let xscale = log(Double(spectrum.length) /
+	    let xscale = log(Double(data.count) /
 			       Double(expand)) / Double(width)
 
             // Draw the spectrum
@@ -221,11 +242,11 @@ class SpectrumView: TunerView
                     for i in last ..< index
                     {
 	                // Don't show DC component
-	                if (i > 0 && i < spectrum.length)
+	                if (i > 0 && i < data.count)
 	                {
-		            if (value < spectrum.data[i])
+		            if (value < data[i])
                             {
-			        value = spectrum.data[i]
+			        value = data[i]
                             }
 		        }
 	            }
@@ -261,11 +282,11 @@ class SpectrumView: TunerView
 	    NSColor.yellow.set()
             path.removeAllPoints()
 
-	    for i in 0 ..< Int(spectrum.count)
+	    for i in 0 ..< values.count
 	    {
 	        // Draw line for values
 
-	        let x = spectrum.values[i] / xscale
+	        let x = values[i] / xscale
 	        path.move(to: NSMakePoint(rect.minX + CGFloat(x),
                                           rect.minY))
 	        path.line(to: NSMakePoint(rect.minX + CGFloat(x),
@@ -281,26 +302,13 @@ class SpectrumView: TunerView
                .font: font]
             context.shouldAntialias = true;
 
-	    for i in 0 ..< Int(spectrum.count)
+	    for i in 0 ..< values.count
 	    {
 	        // Show value for values
 
-	        let f = disp.maxima[i].f
+	        let c = reeds[i].cents / 100
 
-	        // Reference freq
-
-	        let fr = disp.maxima[i].fr
-
-	        let c = -12.0 * log2(fr / f)
-
-	        // Ignore silly values
-
-	        if (!c.isFinite)
-                {
-		    continue
-                }
-
-	        let x = spectrum.values[i] / xscale
+	        let x = values[i] / xscale
 	        let s = String(format: "%+0.0f", c * 100.0)
 	        s.draw(at: NSMakePoint(rect.minX + CGFloat(x),
                                        rect.minY - 2),
@@ -322,14 +330,14 @@ class SpectrumView: TunerView
           [.foregroundColor: NSColor.yellow, .font: font]
         context.shouldAntialias = true;
 
-        if (audio.down)
+        if (settings.downsample)
         {
 	    "D".draw(at: NSMakePoint(rect.minX + 2,
                                      rect.maxY - kTextSize - 3),
                      withAttributes: attribs)
         }
 
-        if (audio.note)
+        if (settings.noteFilter)
         {
 	    "NF".draw(at: NSMakePoint(rect.minX + 2, rect.minY),
                      withAttributes: attribs)

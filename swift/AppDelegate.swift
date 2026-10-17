@@ -19,6 +19,88 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Cocoa
+import Synchronization
+import TunerCapture
+import TunerCore
+import TunerState
+
+// fourCharCode: a control tag from four characters, as the old Audio.h
+// wrote them
+func fourCharCode(_ code: String) -> Int
+{
+    return code.utf8.reduce(0) { ($0 << 8) | Int($1) }
+}
+
+// Checkbox tags
+let kZoom   = fourCharCode("Zoom")
+let kFilt   = fourCharCode("Filt")
+let kMult   = fourCharCode("Mult")
+let kFund   = fourCharCode("Fund")
+let kStrobe = fourCharCode("Strb")
+let kDown   = fourCharCode("Down")
+let kLock   = fourCharCode("Lock")
+let kNote   = fourCharCode("Note")
+
+// Expand and colour tags
+let kExpand = fourCharCode("Expd")
+let kColour = fourCharCode("Colr")
+
+// Reference tags
+let kRefText = fourCharCode("RefT")
+let kRefStep = fourCharCode("RefS")
+
+// Transpose and temperament tags
+let kTrans = fourCharCode("Tran")
+let kTemp  = fourCharCode("Temp")
+let kKey   = fourCharCode("Key ")
+
+// Every setting, written to the defaults as it changes and forwarded
+// to the engine
+@MainActor let settings = Settings()
+
+// The display state machine the views draw from
+@MainActor let model = DisplayModel()
+
+// Views
+var scopeView: ScopeView!
+var spectrumView: SpectrumView!
+var displayView: DisplayView!
+var strobeView: StrobeView!
+var staffView: StaffView!
+var meterView: MeterView!
+
+// At most one hop post waits on the main queue
+final class HopPost: Sendable
+{
+    let pending = Atomic<Bool>(false)
+}
+
+// capturePush: the capture callback; the context holds the engine
+// handle, set before capture starts
+let capturePush: CapturePush =
+{
+    context, samples, count in
+
+    if let engine = context?.assumingMemoryBound(to: OpaquePointer?.self)
+         .pointee
+    {
+        TunerEnginePush(engine, samples, count)
+    }
+}
+
+// copyReadout: the readout line to the pasteboard; nothing in blank
+@MainActor func copyReadout()
+{
+    guard let string = model.copyLine(transpose: settings.transpose) else
+    {
+        return
+    }
+
+    // Put it on the pasteboard
+    let pboard = NSPasteboard.general
+    pboard.clearContents()
+    pboard.setString(string, forType: .string)
+}
 
 // Apparently these aren't declared anywhere
 @objc protocol EditMenuActions
@@ -47,6 +129,7 @@ var tempPopUp: NSPopUpButton!
 var keyPopUp: NSPopUpButton!
 
 // AppDelegate
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate
 {
     let kWidth  = CGFloat(400)
@@ -59,6 +142,18 @@ class AppDelegate: NSObject, NSApplicationDelegate
 
     var stack: NSStackView!
     var timer: Timer!
+
+    // Audio
+    var capture: OpaquePointer?
+    var engine: Engine?
+    let post = HopPost()
+    let context: UnsafeMutablePointer<OpaquePointer?> =
+    {
+        let context = UnsafeMutablePointer<OpaquePointer?>.allocate(capacity: 1)
+        context.initialize(to: nil)
+        return context
+    }()
+    var readoutTick = 0
 
     lazy var applicationName: String =
     {
@@ -380,7 +475,6 @@ class AppDelegate: NSObject, NSApplicationDelegate
                           defer: true)
         window.contentMinSize = NSMakeSize(kWidth, kHeight)
         window.contentAspectRatio = NSMakeSize(kWidth, kHeight)
-        window.showsResizeIndicator = true
         window.collectionBehavior.insert(.fullScreenNone)
         window.title = applicationName
         window.center()
@@ -473,14 +567,14 @@ class AppDelegate: NSObject, NSApplicationDelegate
         window.makeFirstResponder(displayView)
         window.makeMain()
 
-        // Get preferences
-        getPreferences()
+        // Show the strobe or the staff
+        strobeView.enable = settings.strobe
+        staffView.enable = !settings.strobe
 
         // Start audio
-        let result = SetupAudio()
-        if (result != noErr)
+        if let error = startAudio()
         {
-            displayAlert("Tuner", "Audio initialisation failed", result)
+            displayAlert("Tuner", "Audio initialisation failed", error)
         }
 
         // Timer
@@ -494,8 +588,125 @@ class AppDelegate: NSObject, NSApplicationDelegate
     // Update
     @objc func update()
     {
-        meterView.needsDisplay = true
+        if (meterView.changed)
+        {
+            meterView.needsDisplay = true
+        }
         strobeView.needsDisplay = true
+    }
+
+    // startAudio: capture first, for its sample rate, then the engine at
+    // that rate; returns what failed
+    func startAudio() -> String?
+    {
+        var capture: OpaquePointer?
+        let status = CaptureCreate(capturePush, context, &capture)
+        if (status != kCaptureStatusOK)
+        {
+            return String(cString: CaptureStatusString(status))
+        }
+        self.capture = capture
+
+        let engine: Engine
+        do
+        {
+            engine = try Engine(sampleRate: CaptureSampleRate(capture),
+                                temperaments: Temperaments.flattened)
+        }
+
+        catch
+        {
+            return error.message
+        }
+
+        // Settings apply to the engine as it attaches, and after
+        settings.engine = engine
+        self.engine = engine
+
+        // Coalesce: post only when no post is waiting
+        let post = self.post
+        do
+        {
+            try engine.start
+            {
+                if (!post.pending.exchange(true, ordering: .acquiringAndReleasing))
+                {
+                    DispatchQueue.main.async
+                    {
+                        MainActor.assumeIsolated
+                        {
+                            self.hop()
+                        }
+                    }
+                }
+            }
+        }
+
+        catch
+        {
+            return error.message
+        }
+
+        context.pointee = engine.handle
+
+        let started = CaptureStart(capture)
+        if (started != kCaptureStatusOK)
+        {
+            return String(cString: CaptureStatusString(started))
+        }
+
+        return nil
+    }
+
+    // stopAudio: capture, then the engine
+    func stopAudio()
+    {
+        if (capture != nil)
+        {
+            CaptureStop(capture)
+        }
+
+        engine?.stop()
+
+        if (capture != nil)
+        {
+            CaptureDestroy(capture)
+            capture = nil
+        }
+
+        context.pointee = nil
+        settings.engine = nil
+        engine = nil
+    }
+
+    // hop: the newest snapshot into the display model, then mark what
+    // changed; the scope and spectrum copy their arrays now, because
+    // the snapshot's buffers are reused after the next acquire
+    func hop()
+    {
+        post.pending.store(false, ordering: .releasing)
+
+        guard let snapshot = engine?.acquire() else
+        {
+            return
+        }
+
+        model.update(snapshot.hop, now: ProcessInfo.processInfo.systemUptime)
+
+        if (model.readoutTick != readoutTick)
+        {
+            readoutTick = model.readoutTick
+            displayView.needsDisplay = true
+            staffView.needsDisplay = true
+        }
+
+        if (model.traceRefresh)
+        {
+            scopeView.update(snapshot.scope)
+            spectrumView.update(snapshot.spectrum,
+                                binWidth: snapshot.binWidth,
+                                markers: model.markers)
+        }
     }
 
     // showPreferences
@@ -515,35 +726,17 @@ class AppDelegate: NSObject, NSApplicationDelegate
 		          "-2[Key:B\u{266D}]", "-3[Key:A]",
 		          "-4[Key:A\u{266D}]", "-5[Key:G]",
                           "-6[Key:F\u{266F}]"]
-        let kTemperaments = ["Kirnberger II", "Kirnberger III",
-                             "Werckmeister III", "Werckmeister IV",
-                             "Werckmeister V", "Werckmeister VI",
-                             "Bach (Klais)", "Just (Barbour)",
-                             "Equal Temperament", "Pythagorean",
-                             "Van Zwolle", "Meantone (-1/4)",
-                             "Silbermann (-1/6)", "Salinas (-1/3)",
-                             "Zarlino (-2/7)", "Rossi (-1/5)",
-                             "Rossi (-2/9)", "Rameau (-1/4)",
-                             "Kellner", "Vallotti",
-                             "Young II", "Bendeler III",
-                             "Neidhardt I", "Neidhardt II",
-                             "Neidhardt III", "Bruder 1829",
-                             "Barnes 1977", "Lambert 1774",
-                             "Schlick (H. Vogel)", "Meantone # (-1/4)",
-                             "Meantone b (-1/4)", "Lehman-Bach"]
-        let kKeys = ["C", "C\u{266F}", "D", "E\u{266D}",
-                     "E", "F", "F\u{266F}", "G",
-                     "A\u{266D}", "A", "B\u{266D}", "B"]
+        let kKeys = zip(Notes.names, Notes.symbols).map {$0 + $1}
 
         let labels = ["Zoom spectrum", "Filter audio",
                       "Multiple notes", "Fundamental filter",
                       "Display strobe", "Downsample",
                       "Lock display", "Note filter"]
 
-        let values = [spectrumView.zoom, audio.filt,
-                      displayView.mult, audio.fund,
-                      strobeView.enable, audio.down,
-                      displayView.lock, audio.note]
+        let values = [settings.zoom, settings.filter,
+                      settings.multiple, settings.fundamental,
+                      strobeView.enable, settings.downsample,
+                      model.isLocked, settings.noteFilter]
 
         let tags = [kZoom, kFilt, kMult, kFund,
                     kStrobe, kDown, kLock, kNote]
@@ -631,7 +824,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
         expandPopUp = NSPopUpButton()
         expandPopUp.pullsDown = false
         expandPopUp.addItems(withTitles: kExpanse)
-        expandPopUp.selectItem(at: Int(log2(Float(spectrumView.expand))))
+        expandPopUp.selectItem(at: Int(log2(Float(settings.expand))))
         expandPopUp.tag = kExpand
         expandPopUp.target = self
         expandPopUp.action = #selector(popUpChanged)
@@ -648,7 +841,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
         colourPopUp = NSPopUpButton()
         colourPopUp.pullsDown = false
         colourPopUp.addItems(withTitles: kColours)
-        colourPopUp.selectItem(at: strobeView.colour)
+        colourPopUp.selectItem(at: settings.colour)
         colourPopUp.tag = kColour
         colourPopUp.target = self
         colourPopUp.action = #selector(popUpChanged)
@@ -664,7 +857,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
         refLabel.drawsBackground = false
         refText = NSTextField()
         refText.tag = kRefText
-        refText.doubleValue = audio.reference
+        refText.doubleValue = settings.reference
         refText.target = self
         refText.action = #selector(refChanged)
         refStep = NSStepper()
@@ -672,7 +865,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
         refStep.maxValue = 480.0
         refStep.minValue = 420.0
         refStep.increment = 1.0
-        refStep.doubleValue = audio.reference
+        refStep.doubleValue = settings.reference
         refStep.target = self
         refStep.action = #selector(refChanged)
 
@@ -687,7 +880,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
         transPopUp = NSPopUpButton()
         transPopUp.pullsDown = false
         transPopUp.addItems(withTitles: kTranspose)
-        transPopUp.selectItem(at: displayView.trans)
+        transPopUp.selectItem(at: settings.transpose)
         transPopUp.tag = kTrans
         transPopUp.target = self
         transPopUp.action = #selector(popUpChanged)
@@ -703,8 +896,8 @@ class AppDelegate: NSObject, NSApplicationDelegate
         tempLabel.drawsBackground = false
         tempPopUp = NSPopUpButton()
         tempPopUp.pullsDown = false
-        tempPopUp.addItems(withTitles: kTemperaments)
-        tempPopUp.selectItem(at: Int(audio.temper))
+        tempPopUp.addItems(withTitles: Temperaments.names)
+        tempPopUp.selectItem(at: settings.temperament)
         tempPopUp.tag = kTemp
         tempPopUp.target = self
         tempPopUp.action = #selector(popUpChanged)
@@ -721,7 +914,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
         keyPopUp = NSPopUpButton()
         keyPopUp.pullsDown = false
         keyPopUp.addItems(withTitles:kKeys)
-        keyPopUp.selectItem(at: Int(audio.key))
+        keyPopUp.selectItem(at: settings.key)
         keyPopUp.tag = kKey
         keyPopUp.target = self
         keyPopUp.action = #selector(popUpChanged)
@@ -776,7 +969,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
             button.title = label
             button.tag = index
             button.setButtonType(.switch)
-            button.state = getNote(Int32(index)) ? .on: .off
+            button.state = settings.notes[index] ? .on: .off
             button.target = self
             button.action = #selector(noteClicked)
 
@@ -812,7 +1005,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
             button.title = String(format: "Octave %d", index)
             button.tag = index
             button.setButtonType(.switch)
-            button.state = getOctave(Int32(index)) ? .on: .off
+            button.state = settings.octaves[index] ? .on: .off
             button.target = self
             button.action = #selector(octaveClicked)
 
@@ -889,19 +1082,19 @@ class AppDelegate: NSObject, NSApplicationDelegate
         switch sender.tag
         {
         case kZoom:
-            spectrumView.zoom = (sender.state == .on) ? true: false
+            settings.zoom = (sender.state == .on) ? true: false
             spectrumView.needsDisplay = true
 
         case kFilt:
-            audio.filt = (sender.state == .on) ? true: false
+            settings.filter = (sender.state == .on) ? true: false
             scopeView.needsDisplay = true
 
         case kMult:
-            displayView.mult = (sender.state == .on) ? true: false
+            settings.multiple = (sender.state == .on) ? true: false
             displayView.needsDisplay = true
 
         case kFund:
-            audio.fund = (sender.state == .on) ? true: false
+            settings.fundamental = (sender.state == .on) ? true: false
             scopeView.needsDisplay = true
 
         case kStrobe:
@@ -914,15 +1107,15 @@ class AppDelegate: NSObject, NSApplicationDelegate
             staffView.needsDisplay = true
 
         case kDown:
-            audio.down = (sender.state == .on) ? true: false
+            settings.downsample = (sender.state == .on) ? true: false
             spectrumView.needsDisplay = true
 
         case kLock:
-            displayView.lock = (sender.state == .on) ? true: false
+            model.isLocked = (sender.state == .on) ? true: false
             displayView.needsDisplay = true
 
         case kNote:
-            audio.note = (sender.state == .on) ? true: false
+            settings.noteFilter = (sender.state == .on) ? true: false
             spectrumView.needsDisplay = true
 
         default:
@@ -937,27 +1130,32 @@ class AppDelegate: NSObject, NSApplicationDelegate
 
         switch sender.tag
         {
+        case kExpand:
+            // Update spectrum view
+            settings.expand = 1 << index
+            spectrumView.needsDisplay = true
+
         case kColour:
             // Update strobe view
-            strobeView.colour = index
+            settings.colour = index
             strobeView.changed = true
             strobeView.needsDisplay = true
 
         case kTrans:
             // Update display
-            displayView.trans = index
+            settings.transpose = index
             displayView.needsDisplay = true
             staffView.needsDisplay = true
 
         case kTemp:
             // Update display
-            audio.temper = Int32(index)
+            settings.temperament = index
             displayView.needsDisplay = true
             staffView.needsDisplay = true
 
         case kKey:
             // Update display
-            audio.key = Int32(index)
+            settings.key = index
             displayView.needsDisplay = true
             staffView.needsDisplay = true
 
@@ -982,20 +1180,23 @@ class AppDelegate: NSObject, NSApplicationDelegate
             break
         }
 
-        audio.reference = value
+        // A value out of range leaves the reference as it was
+        settings.reference = value
+        refText.doubleValue = settings.reference
+        refStep.doubleValue = settings.reference
         displayView.needsDisplay = true
     }
 
     // noteClicked
     @objc func noteClicked(sender: NSButton)
     {
-        setNote((sender.state == .on) ? true: false, Int32(sender.tag));
+        settings.notes[sender.tag] = (sender.state == .on) ? true: false
     }
 
     // octaveClicked
     @objc func octaveClicked(sender: NSButton)
     {
-        setOctave((sender.state == .on) ? true: false, Int32(sender.tag))
+        settings.octaves[sender.tag] = (sender.state == .on) ? true: false
     }
 
     // print
@@ -1004,92 +1205,22 @@ class AppDelegate: NSObject, NSApplicationDelegate
         window.printWindow(sender)
     }
 
-    // getPreferences
-    func getPreferences()
+    // copy: Edit > Copy copies the readout
+    @objc func copy(_ sender: Any?)
     {
-        let keys = ["Zoom", "Filter", "Strobe", "Down"]
-
-        // Check defaults
-        let defaults = UserDefaults.standard
-        let ref = defaults.double(forKey: "Ref")
-        if (ref == 0)
-        {
-            audio.reference = Double(kA5Reference)
-            audio.temper = 8
-            displayView.trans = 6
-            spectrumView.zoom = true
-            spectrumView.expand = 1
-            strobeView.enable = false
-            strobeView.colour = 1
-            return
-        }
-
-        audio.reference = ref
-        audio.temper = Int32(defaults.integer(forKey: "Temper"))
-        audio.key = Int32(defaults.integer(forKey: "Key"))
-        displayView.trans = defaults.integer(forKey: "Trans")
-        strobeView.colour = defaults.integer(forKey: "Colours")
-        for (index, key) in keys.enumerated()
-        {
-            switch index
-            {
-            case 0:
-                spectrumView.zoom = defaults.bool(forKey: key)
-                spectrumView.needsDisplay = true
-
-            case 1:
-                audio.filt = defaults.bool(forKey: key)
-                scopeView.needsDisplay = true
-
-            case 2:
-                strobeView.enable = defaults.bool(forKey: key)
-                staffView.enable = !strobeView.enable
-                strobeView.isHidden = !strobeView.enable
-                staffView.isHidden = !staffView.enable
-                strobeView.needsDisplay = true
-                staffView.needsDisplay = true
-
-            case 3:
-                audio.down = defaults.bool(forKey: key)
-
-            default:
-                break
-            }
-        }
-    }
-
-    // savePreferences
-    func savePreferences()
-    {
-        let keys = ["Zoom", "Filter", "Strobe", "Down"]
-        let values = [spectrumView.zoom, audio.filt,
-                      strobeView.enable, audio.down]
-
-        let defaults = UserDefaults.standard
-        defaults.set(audio.reference, forKey: "Ref")
-        defaults.set(audio.temper, forKey: "Temper")
-        defaults.set(audio.key, forKey: "Key")
-        defaults.set(displayView.trans, forKey: "Trans")
-        defaults.set(strobeView.colour, forKey: "Colours")
-        for (index, key) in keys.enumerated()
-        {
-            defaults.set(values[index], forKey: key)
-        }
+        copyReadout()
     }
 
     // DisplayAlert
     func displayAlert(_ message: String, _ informativeText: String,
-                      _ status: OSStatus)
+                      _ error: String)
     {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = message
 
-        let error = (status > 0) ? NSFileTypeForHFSTypeCode(OSType(status))! :
-          String(utf8String: AudioUnitErrString(status))!
-
-        alert.informativeText = String(format: "%@ %@ (%x)", informativeText,
-                                       error, status)
+        alert.informativeText = String(format: "%@ %@", informativeText,
+                                       error)
         alert.runModal()
     }
 
@@ -1104,9 +1235,8 @@ class AppDelegate: NSObject, NSApplicationDelegate
     func applicationWillTerminate(_ aNotification: Notification)
     {
         // Insert code here to tear down your application
-        savePreferences()
         timer.invalidate()
-        ShutdownAudio()
+        stopAudio()
     }
 
     // applicationSupportsSecureRestorableState

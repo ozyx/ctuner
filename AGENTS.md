@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent native ports in sibling directories. There is no shared code between ports; each is a self-contained GUI app with its own copy of the FFT/peak-detection pipeline and its own `Temperaments.h`.
+A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent native ports in sibling directories. There is no shared code between ports; each is a self-contained GUI app with its own copy of the FFT/peak-detection pipeline and its own temperament table. The Mac app's engine now lives in the Swift package at the repo root (`Sources/`).
 
 | Dir | Platform | Language / toolkit | Status |
 | --- | --- | --- | --- |
-| `swift/` | macOS 14+ (arm64) | Swift + Objective-C, AppKit, CoreAudio, Accelerate | Current Mac app; most active |
+| `swift/` | macOS 26+ (arm64) | Swift AppKit window on the package's C core and AUHAL capture | Current Mac app (stage 1); most active |
 | `linux/` | Linux | C++, GTK3 + ALSA (`tuner.cpp`); `tuner.c` is an older GTK2 version | Current |
 | `mac/` | macOS 10.4 (i386, Carbon) | C | Legacy, superseded by `swift/` |
 
@@ -23,11 +23,14 @@ Everything is plain `make`. The Swift package at the repo root holds the new ana
 make test                   # swift test, debug
 make test-release           # swift test, release (the shipped optimisation level)
 make sanitize               # address+undefined, then thread
-make build                  # release build of every product
+make core-check             # the core warning-free under -Wall -Wextra, no Cocoa/ObjC/logging symbols
+make core-leaks             # the engine's start/stop/destroy lifecycle 100 times under leaks
+make build                  # release build of every product, the app's Tuner product included
 make fixtures               # rewrite the golden fixtures from the frozen engine
 make fixture-screen         # check every fixture holds across builds and sanitizers
 
-# macOS (Swift app) — builds an arm64 binary and Tuner.app
+# macOS (Swift app) — swift build -c release --product Tuner at the
+# repo root, then bundles that binary as Tuner.app
 cd swift && make            # Tuner.app
 cd swift && make dmg        # Tuner-<version>.dmg (version read from Info.plist)
 cd swift && make clean
@@ -44,18 +47,20 @@ Linux notes: use the plain `Makefile`, not autoconf. Running `./configure` overw
 
 ## Swift app architecture (`swift/`)
 
-The audio engine is Objective-C; the UI is Swift. They talk through globals, not objects.
+Stage 1 of the rewrite plan (`docs/plans/2026-10-16-1644-feat-mac-native-rewrite-plan.md`): today's AppKit window runs on the package's engine. `swift/` holds only the window's Swift sources and the bundle and DMG rules; the sources compile as the package's `TunerAppKit` executable target (`path: "swift"`, an explicit `sources:` list, Swift 5 language mode). There is no Objective-C in `swift/`, no bridging header and no generated header.
 
-- `Audio.m` / `Audio.h`: CoreAudio HAL input unit, `InputProc` callback, and the `ProcessAudio` block that runs the overlapped FFT (vDSP), phase-difference frequency measurement, Butterworth filter, optional downsampling, and peak detection (up to `kMaxima` = 8). Results are written into global structs declared in `Audio.h`: `scope`, `spectrum`, `disp` (maxima), `audio` (settings such as `reference`, `temper`, `key`, `filt`, `down`, `fund`, `note`), and `filters` (per-note/per-octave enable flags).
-- Swift views read those globals directly. `TunerView.swift` is the base `NSView` (shared note names, edge drawing); `ScopeView`, `SpectrumView`, `DisplayView`, `StrobeView`, `StaffView`, `MeterView` subclass it. `Audio.h` also declares global pointers (`scopeView`, `spectrumView`, ...) that the C side uses to request redraws.
-- `AppDelegate.swift` builds the whole UI in code (no nibs/xibs; the menu is also nibless, see `main.swift`), starts audio via `SetupAudio()`, runs a 20 ms `Timer` that marks meter/strobe views dirty, and owns the Preferences window and note-filter panel. Settings changes write straight to the `audio` global and call `needsDisplay` on affected views.
-- Constants (sample rate, FFT size `kSamples`, four-char-code tags for controls) live in `Audio.h` and are visible to Swift through `Tuner-Bridging-Header.h`.
+Package targets, dependencies pointing one way (app to state to core and capture):
 
-Two-way bridging gotcha: `Audio.h` includes `Tuner-Swift.h`, which `swiftc` generates (`-emit-objc-header-path`) from the Swift sources. The generated header is committed so `Audio.m` can compile first. If you add or rename Swift classes/members that ObjC relies on, rebuild and commit the regenerated `Tuner-Swift.h`.
+- `TunerCore` (C on Accelerate, no Cocoa, no globals): the analysis engine behind an opaque handle. It owns its analysis thread; capture pushes samples into a wait-free ring (`TunerEnginePush`), and each hop is published to a triple buffer that one consumer reads with `TunerEngineAcquire`. Settings are atomics set through `TunerEngineSet...`.
+- `TunerCapture` (Objective-C): the AUHAL input unit behind `CaptureCreate`/`CaptureStart`/`CaptureStop`/`CaptureDestroy`. Create does all the setup, so `CaptureSampleRate` is known before the engine is made; the input callback only renders and calls the push function it was given.
+- `TunerState` (Swift, no AppKit): `Engine` (wraps the handle; `start(onHop:)` runs its callback on the analysis thread; `acquire()` returns a `Snapshot` whose scope and spectrum buffers are valid only until the next acquire), `DisplayModel` (the blank/live/stale/locked state machine: readout cadence, 1.5 s stale, lock, meter smoothing, the every-16th-hop trace refresh, the copy line, the staff note), `Settings` (every setting, written to `UserDefaults` as it changes and forwarded to an attached engine; reads today's nine legacy keys on first launch), `Notes`, `Temperaments`.
 
-`Audio.swift` is an unfinished Swift port of `Audio.m`. It is not in the Makefile's `SOURCES` and does not compile; ignore it unless you are deliberately continuing that port.
+The window (`swift/`):
 
-The app links against the Swift runtime that ships with macOS and nothing is bundled, so the Command Line Tools are enough to build it; no Xcode install is needed.
+- `AppDelegate.swift` builds the whole UI in code (no nibs; the menu is nibless, see `main.swift`) and owns the Preferences window and the note-filter panel. It holds the control tags (four-char codes), the `settings` and `model` globals and the view globals. `startAudio()` creates capture first for its rate, then the `Engine`, attaches it to `settings`, writes the engine handle into the push context and starts capture. The engine's `onHop` posts to the main queue at most once at a time (an atomic flag); `hop()` acquires one snapshot, feeds `model.update`, marks the display and staff dirty when `readoutTick` changes, and on `traceRefresh` copies the scope and spectrum arrays into those views and marks them dirty. A 20 ms `Timer` marks the strobe and meter dirty. Shutdown stops capture, then the engine.
+- `TunerView.swift` is the base `NSView` (edge drawing, key handling); `ScopeView`, `SpectrumView`, `DisplayView`, `StrobeView`, `StaffView`, `MeterView` subclass it and draw from `model`, `settings` and the arrays copied into them. Handlers change `settings` or `model.isLocked` and update the matching Preferences control.
+
+The app links against the Swift runtime that ships with macOS and nothing is bundled, so the Command Line Tools are enough to build it; no Xcode install is needed. The package floor is macOS 26, so the app needs macOS 26.
 
 ## Conventions
 

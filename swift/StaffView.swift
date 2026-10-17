@@ -20,6 +20,7 @@
 
 
 import Cocoa
+import TunerState
 
 class StaffView: TunerView
 {
@@ -149,21 +150,7 @@ class StaffView: TunerView
         3, 4, 5, 5, 6, 6
       ]
 
-    // Accidentals
-    let accidentals =
-      [
-        kNatural, kSharp, kNatural, kFlat, kNatural, kNatural,
-        kSharp, kNatural, kFlat, kNatural, kFlat, kNatural
-      ]
-
-    @objc var note = 0
-    {
-        didSet
-        {
-            needsDisplay = true
-        }
-    }
-    @objc var enable = true
+    var enable = true
     {
         didSet
         {
@@ -178,11 +165,11 @@ class StaffView: TunerView
         if (event.type == .leftMouseDown)
         {
             enable = !enable
+            strobeView.enable = !enable
             if (strbBox != nil)
             {
                 strbBox.state = strobeView.enable ? .on: .off
             }
-            strobeView.enable = !enable
         }
     }
 
@@ -369,12 +356,18 @@ class StaffView: TunerView
         transform = AffineTransform(scale: scale)
         flat.transform(using: transform)
 
-        // Calculate transform for note
+        // No note head until the first note
+        guard let note = model.staffNote(transpose: settings.transpose) else
+        {
+            return
+        }
+
+        // Calculate transform for note; a note transposed below C0
+        // draws as octave 0, as it always has
         let xBase = lineWidth * 14;
         let yBase = lineHeight * 14;
-        let note = self.note - translate[displayView.trans];
-        var octave = note / kOctave;
-        let index = (note + kOctave) % kOctave;
+        var octave = Swift.max(note.octave, 0);
+        let index = note.index;
 
         // Wrap top two octaves
         if octave >= 6
@@ -405,13 +398,13 @@ class StaffView: TunerView
         head.transform(using: transform)
         head.fill()
 
-        switch accidentals[Int(index)]
+        switch note.accidental
         {
-        case kNatural:
+        case .natural:
             // Do nothing
             break
 
-        case kSharp:
+        case .sharp:
             // Draw sharp
             transform =
               AffineTransform(translationByX:
@@ -420,7 +413,7 @@ class StaffView: TunerView
             sharp.transform(using: transform)
             sharp.fill()
 
-        case kFlat:
+        case .flat:
             // Draw flat
             transform =
               AffineTransform(translationByX:
@@ -428,10 +421,6 @@ class StaffView: TunerView
                               byY: -yBase + dy + CGFloat(lineHeight / 2))
             flat.transform(using: transform)
             flat.fill()
-
-        default:
-            // Do nothing
-            break
         }
     }
 }

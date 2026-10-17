@@ -19,6 +19,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Cocoa
+import TunerState
 
 class ScopeView: TunerView
 {
@@ -27,14 +28,37 @@ class ScopeView: TunerView
 
     var max: Double = 0
 
+    // The newest input samples, copied from a snapshot
+    var data: [Double] = []
+
+    // update: copy the samples and redraw; the snapshot's buffer is
+    // reused after the next acquire, so nothing keeps it
+    func update(_ samples: UnsafeBufferPointer<Double>)
+    {
+        if (data.count != samples.count)
+        {
+            data = Array(samples)
+        }
+
+        else
+        {
+            _ = data.withUnsafeMutableBufferPointer
+            {
+                $0.update(fromContentsOf: samples)
+            }
+        }
+
+        needsDisplay = true
+    }
+
     override func mouseDown(with event: NSEvent)
     {
         if (event.type == .leftMouseDown)
         {
-            audio.filt = !audio.filt
+            settings.filter = !settings.filter
             if (filtBox != nil)
             {
-                filtBox.state = audio.filt ? .on: .off
+                filtBox.state = settings.filter ? .on: .off
             }
             needsDisplay = true;
         }
@@ -71,7 +95,7 @@ class ScopeView: TunerView
                                     to: NSMakePoint(rect.maxX, -y))
         }
 
-        if (scope.data == nil)
+        if (data.isEmpty)
         {
             return
         }
@@ -88,7 +112,7 @@ class ScopeView: TunerView
 
         for i in 1 ..< Int(width)
         {
-	    dx = scope.data[i] - scope.data[i - 1]
+	    dx = data[i] - data[i - 1]
 	    if (maxdx < dx)
 	    {
 	        maxdx = dx
@@ -120,12 +144,18 @@ class ScopeView: TunerView
 
         for i in 0 ..< Int(width)
         {
-	    if (max < abs(scope.data[n + i * kScale]))
+            // Stop at the end of the samples
+            if (n + i * kScale >= data.count)
             {
-	        max = abs(scope.data[n + i * kScale])
+                break
             }
 
-	    let y = scope.data[n + i * kScale] / yscale
+	    if (max < abs(data[n + i * kScale]))
+            {
+	        max = abs(data[n + i * kScale])
+            }
+
+	    let y = data[n + i * kScale] / yscale
 	    path.line(to: NSMakePoint(rect.minX + CGFloat(i), CGFloat(y)))
         }
 
@@ -138,7 +168,7 @@ class ScopeView: TunerView
            .font: font]
 
         // Show F if filtered
-        if (audio.filt)
+        if (settings.filter)
         {
             "F".draw(at: NSMakePoint(rect.minX + 2,
                                      rect.midY - kTextSize - 5),
@@ -146,7 +176,7 @@ class ScopeView: TunerView
         }
 
         // Show FF if fundamental filter
-        if (audio.fund)
+        if (settings.fundamental)
         {
             "FF".draw(at: NSMakePoint(rect.minX + 2, -rect.midY + 2),
                      withAttributes: attribs)

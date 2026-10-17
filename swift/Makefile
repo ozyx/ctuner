@@ -10,16 +10,12 @@ RM = rm
 MD = mkdir
 CP = cp
 LN = ln
-CC = gcc
 
 HDIU = hdiutil
-SWIFTC = swiftc
+SWIFT = swift
 PLB = /usr/libexec/PlistBuddy
 SIPS = sips
 IBT = ibtool
-
-AUDIO = Audio
-AUDIOOBJ = $(AUDIO).o
 
 APPNAME = Tuner
 
@@ -35,17 +31,12 @@ APPBUNDLEICON = $(APPBUNDLECONTENTS)/Resources
 APPDMG = $(APPNAME).dmg
 APPVDMG = $(APPNAME)-$(APPVERSION).dmg
 
-HEADER = Tuner-Bridging-Header.h
-SWIFTH = Tuner-Swift.h
-
-SOURCES = AppDelegate.swift ScopeView.swift SpectrumView.swift \
-	StrobeView.swift DisplayView.swift MeterView.swift \
-	StaffView.swift TunerView.swift main.swift
-
-SFLAGS = -target arm64-apple-macos14 -swift-version 5 -module-name Tuner \
-	-import-objc-header $(HEADER) -emit-objc-header-path $(SWIFTH)
-
-CFLAGS = -target arm64-apple-macos14
+# The app is the Tuner product (the TunerAppKit target) of the package
+# at the repo root, built in release, so the shipped objects are the
+# tested ones
+PACKAGE = ..
+PRODUCT = Tuner
+BINPATH = $(PACKAGE)/.build/release
 
 $(APPBUNDLE): $(APPNAME) $(APPNAME).icns Info.plist PkgInfo $(APPNAME).entitlements
 	$(RM) -rf $(APPBUNDLE)
@@ -57,11 +48,12 @@ $(APPBUNDLE): $(APPNAME) $(APPNAME).icns Info.plist PkgInfo $(APPNAME).entitleme
 	$(CP) $(APPNAME).entitlements $(APPBUNDLERESOURCES)/
 	$(CP) $(APPNAME) $(APPBUNDLEMACOS)/
 
-$(APPNAME): $(SOURCES) $(AUDIOOBJ)
-	$(SWIFTC) $(SOURCES) $(AUDIOOBJ) -o $(APPNAME) $(SFLAGS)
+# Always ask the package; it rebuilds only what changed
+$(APPNAME): FORCE
+	cd $(PACKAGE) && $(SWIFT) build -c release --product $(PRODUCT)
+	$(CP) $(BINPATH)/$(PRODUCT) $(APPNAME)
 
-$(AUDIOOBJ):	$(AUDIO).m $(AUDIO).h Temperaments.h Makefile
-	$(CC) -c $(CFLAGS) $(AUDIO).m -o $(AUDIOOBJ)
+FORCE:
 
 $(APPNAME).icns: $(APPNAME).png
 	$(RM) -rf $(APPNAME).iconset
@@ -81,7 +73,7 @@ $(APPNAME).icns: $(APPNAME).png
 
 clean:
 	$(RM) -rf $(APPBUNDLE)
-	$(RM) -f $(APPNAME).icns $(APPNAME) $(AUDIOOBJ) $(APPDMG) $(APPVDMG)
+	$(RM) -f $(APPNAME).icns $(APPNAME) $(APPDMG) $(APPVDMG)
 
 $(APPVDMG): $(APPBUNDLE)
 	$(HDIU) create -size 16m -fs HFS+ -volname $(APPNAME) -ov $(APPNAME) -quiet
@@ -93,3 +85,5 @@ $(APPVDMG): $(APPBUNDLE)
 	$(HDIU) convert -format UDZO -o $(APPVDMG) -ov $(APPDMG) -quiet
 
 dmg:	$(APPVDMG)
+
+.PHONY: dmg clean FORCE

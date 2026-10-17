@@ -20,7 +20,16 @@ TESTINGPLUGIN = $(if $(filter $(CLT),$(shell xcode-select -p 2>/dev/null)),\
 FIXTURES = Tests/TunerCoreTests/Fixtures
 BIN = .build/release
 
-.PHONY: build test test-release sanitize fixtures fixture-screen clean
+# The core compiled on its own with every warning an error, and the
+# symbols it would need from Cocoa, the Objective-C runtime or a logger
+CORE = Sources/TunerCore
+COREBUILD = .build/core-check
+CORESOURCES = $(wildcard $(CORE)/*.c)
+COREOBJECTS = $(patsubst $(CORE)/%.c,$(COREBUILD)/%.o,$(CORESOURCES))
+CORECFLAGS = -O2 -Wall -Wextra -Werror -I$(CORE)/include
+FORBIDDEN = '_objc_|_OBJC_|_NS|_CF|_os_log|_syslog|_asl_|printf|_puts|_fputs|_putchar|_fwrite|_perror'
+
+.PHONY: build test test-release sanitize core-check core-leaks fixtures fixture-screen clean
 
 build:
 	$(SWIFT) build -c release
@@ -36,6 +45,24 @@ test-release:
 sanitize:
 	$(SWIFT) test --sanitize=address --sanitize=undefined $(TESTINGPLUGIN)
 	$(SWIFT) test --sanitize=thread $(TESTINGPLUGIN)
+
+# The core builds warning-free and links nothing from Cocoa, the
+# Objective-C runtime or a logger
+core-check: $(COREOBJECTS)
+	@if nm -u $(COREOBJECTS) | grep -E $(FORBIDDEN); then \
+		echo "core-check: the core needs a forbidden symbol"; exit 1; fi
+	@echo "core-check: clean"
+
+# The engine's lifecycle a hundred times under leaks; it exits non-zero
+# when anything leaks
+core-leaks: $(COREOBJECTS)
+	clang -g -I$(CORE)/include Scripts/core-leaks.c $(COREOBJECTS) \
+		-framework Accelerate -o $(COREBUILD)/core-leaks
+	MallocStackLogging=1 leaks --atExit -- $(COREBUILD)/core-leaks
+
+$(COREBUILD)/%.o: $(CORE)/%.c $(wildcard $(CORE)/*.h $(CORE)/include/*.h)
+	@mkdir -p $(COREBUILD)
+	clang $(CORECFLAGS) -c $< -o $@
 
 # Write every golden fixture from the frozen reference engine; a second
 # run must leave the fixture files unchanged

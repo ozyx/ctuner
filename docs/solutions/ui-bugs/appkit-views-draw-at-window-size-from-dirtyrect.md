@@ -54,14 +54,13 @@ The app links against the macOS 27 SDK with a macOS 14 deployment target (`otool
 
 Apple documents the change by OS version. This session concluded, without checking an old binary, that AppKit gates it on the SDK an app links against, which is why upstream's older build is unaffected on the same Mac.
 
-`TunerView` treated `dirtyRect` as "the area of this view", which held under older SDKs. Under the new ones, every view laid itself out at window size. The meter is the last view in the `NSStackView` (`swift/AppDelegate.swift:413-414`) and is redrawn every 20 ms by the timer at `swift/AppDelegate.swift:487`, so it painted over all the others.
+`TunerView` treated `dirtyRect` as "the area of this view", which held under older SDKs. Under the new ones, every view laid itself out at window size. The meter is the last view in the `NSStackView` (`swift/AppDelegate.swift:413-414`) and is redrawn every 20 ms by the timer at `swift/AppDelegate.swift:487`, so it painted over all the others. (Line numbers are from the time of the fix; in stage 1 the fix is at `swift/TunerView.swift:36`.)
 
 `bounds` is always the view's own area. These views redraw in full every time, so drawing from `bounds` gives the same picture the old SDK did. `DrawEdge` also sets a clip path inset from that rect, so each view's drawing stays inside it.
 
 ## Prevention
 
 - Size layout from `bounds`, never from `dirtyRect`. Treat `dirtyRect` only as a hint for what may be skipped, and only in views that draw part of themselves.
-- `swift/StatusView.swift:36-39` still draws its line from `NSWidth(dirtyRect)` and `NSHeight(dirtyRect)`. It is not in the Makefile's `SOURCES`, so it does not affect the app today. Switch it to `bounds` before anything starts using it.
 - A new `NSView` subclass that does not go through `TunerView.draw` must size from `bounds` itself.
 - If views ever draw over one another again, log `dirtyRect` and `bounds` side by side in `draw(_:)`, writing to stderr, before changing code.
 
