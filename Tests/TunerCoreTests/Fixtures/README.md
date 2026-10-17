@@ -80,7 +80,7 @@ The golden tests skip the first 20 hops, while the window fills and the phase hi
 
 ## Stability screen
 
-`make fixture-screen` builds the frozen reference at `-O0`, at `-O3` and with `-ffp-contract=off`, runs every fixture, and fails if `found`, `note` or `count` differs anywhere from the committed file. Every committed fixture passes. A many-peak fixture that fills the maxima list was tried and dropped: it changed count at `-O3` and under the address sanitizer, because of the out-of-bounds write listed below.
+`make fixture-screen` builds the frozen reference at `-O0`, at `-O3` and with `-ffp-contract=off`, runs every fixture, and fails if `found`, `note` or `count` differs anywhere from the committed file. It skips that check for a fixture marked `same_binary_only 1`, which sits on a threshold on purpose. Every committed fixture passes. A many-peak fixture that fills the maxima list was tried and dropped: it changed count at `-O3` and under the address sanitizer, because of the out-of-bounds write listed below.
 
 ## Known sanitizer reports in the frozen engine
 

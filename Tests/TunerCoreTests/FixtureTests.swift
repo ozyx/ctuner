@@ -46,10 +46,18 @@ struct FixtureTests
     // The measured frequency is within the header's bound of the
     // analytic frequency on every found hop after warm-up, and every hop
     // after warm-up is found
-    @Test(arguments: Fixture.all.filter
-          {
-              (try? $0.header()["expect_hz"]) != nil
-          })
+    static let tones = Fixture.all.filter
+    {
+        (try? $0.header()["expect_hz"]) != nil
+    }
+
+    // The accuracy test cannot pass by finding nothing to check
+    @Test func tonesPresent()
+    {
+        #expect(FixtureTests.tones.count >= 18)
+    }
+
+    @Test(arguments: FixtureTests.tones)
     func accuracy(fixture: Fixture) throws
     {
         let header = try fixture.header()

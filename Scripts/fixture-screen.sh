@@ -56,8 +56,16 @@ do
     input="$FIX/$name.bin"
     expected="$FIX/$name.expected.txt"
 
-    # found, note and count in every build
-    for variant in ref-O0 ref-O3 ref-nocontract
+    # found, note and count in every build, except for a fixture that
+    # sits on a threshold on purpose, where only the same-binary check
+    # applies
+    variants="ref-O0 ref-O3 ref-nocontract"
+    if grep -qx "same_binary_only 1" "$header"
+    then
+        variants=""
+    fi
+
+    for variant in $variants
     do
         "$WORK/$variant" "$header" "$input" > "$WORK/$name.$variant.txt"
         if ! cmp -s <(cut -d' ' -f1-4 "$expected") \
