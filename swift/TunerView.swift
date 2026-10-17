@@ -19,22 +19,10 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Cocoa
+import TunerState
 
 class TunerView: NSView
 {
-    let kOctave = 12
-
-    let translate =
-      [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6]
-
-    let notes =
-      ["C", "C", "D", "E", "E", "F",
-       "F", "G", "A", "A", "B", "B"]
-
-    let sharps =
-      ["", "\u{0266F}", "", "\u{0266D}", "", "",
-       "\u{0266F}", "", "\u{0266D}", "", "\u{0266D}", ""]
-
     var rect: NSRect = .zero
     var width: CGFloat = 0
     var height: CGFloat = 0
@@ -84,35 +72,25 @@ class TunerView: NSView
         switch key.lowercased()
         {
         case "c":
-            // Create string
-            let string =
-              String(format:
-                       "%@%@%d %+4.2lf\u{00A2} %4.2lfHz %4.2lfHz %4.2lfHz\n",
-                     notes[(displayView.n - translate[displayView.trans] +
-                              kOctave) % notes.endIndex],
-		     sharps[(displayView.n - translate[displayView.trans] +
-                               kOctave) % sharps.endIndex],
-                     displayView.n / kOctave, displayView.c * 100.0,
-                     displayView.fr, displayView.f,
-                     displayView.f - displayView.fr)
-
-            // Put it on the pasteboard
-            let pboard = NSPasteboard.general
-            pboard.clearContents()
-            pboard.setString(string, forType: .string)
+            // Copy the readout
+            copyReadout()
 
         case "k":
             // Change colour
-            strobeView.colour += 1
-            if (strobeView.colour >= strobeView.kMaxColours)
+            if (settings.colour + 1 >= strobeView.kMaxColours)
             {
-                strobeView.colour = 0
+                settings.colour = 0
+            }
+
+            else
+            {
+                settings.colour += 1
             }
 
             // Update popup
             if (colourPopUp != nil)
             {
-                colourPopUp.selectItem(at: strobeView.colour)
+                colourPopUp.selectItem(at: settings.colour)
             }
 
             // Update strobe view
@@ -121,40 +99,40 @@ class TunerView: NSView
 
         case "d":
             // Update downsampling
-            audio.down = !audio.down
+            settings.downsample = !settings.downsample
             if (downBox != nil)
             {
-                downBox.state = audio.down ? .on: .off
+                downBox.state = settings.downsample ? .on: .off
             }
             // Update spectrum view
             spectrumView.needsDisplay = true
 
         case "f":
             // Update filter
-            audio.filt = !audio.filt
+            settings.filter = !settings.filter
             if (filtBox != nil)
             {
-                filtBox.state = audio.filt ? .on: .off
+                filtBox.state = settings.filter ? .on: .off
             }
             // Update scope view
             scopeView.needsDisplay = true
 
         case "l":
             // Update display lock
-            displayView.lock = !displayView.lock
+            model.isLocked = !model.isLocked
             if (lockBox != nil)
             {
-                lockBox.state = displayView.lock ? .on: .off
+                lockBox.state = model.isLocked ? .on: .off
             }
             // Update display
             displayView.needsDisplay = true
 
         case "m":
             // Update multiple notes
-            displayView.mult = !displayView.mult
+            settings.multiple = !settings.multiple
             if (multBox != nil)
             {
-                multBox.state = displayView.mult ? .on: .off
+                multBox.state = settings.multiple ? .on: .off
             }
             // Update display
             displayView.needsDisplay = true
@@ -171,36 +149,44 @@ class TunerView: NSView
 
         case "z":
             // Update zoom
-            spectrumView.zoom = !spectrumView.zoom
+            settings.zoom = !settings.zoom
             if (zoomBox != nil)
             {
-                zoomBox.state = spectrumView.zoom ? .on: .off
+                zoomBox.state = settings.zoom ? .on: .off
             }
 
         case "+":
             // Expand spectrum
-            spectrumView.expand *= 2
-            if (spectrumView.expand > kMaxExpand)
+            if (settings.expand * 2 > kMaxExpand)
             {
-                spectrumView.expand = kMinExpand
+                settings.expand = kMinExpand
+            }
+
+            else
+            {
+                settings.expand *= 2
             }
             if (expandPopUp != nil)
             {
                 expandPopUp
-                  .selectItem(at: Int(log2(Float(spectrumView.expand))))
+                  .selectItem(at: Int(log2(Float(settings.expand))))
             }
 
         case "-":
             // Contract spectrum
-            spectrumView.expand /= 2
-            if (spectrumView.expand < kMinExpand)
+            if (settings.expand / 2 < kMinExpand)
             {
-                spectrumView.expand = kMaxExpand
+                settings.expand = kMaxExpand
+            }
+
+            else
+            {
+                settings.expand /= 2
             }
             if (expandPopUp != nil)
             {
                 expandPopUp
-                  .selectItem(at: Int(log2(Float(spectrumView.expand))))
+                  .selectItem(at: Int(log2(Float(settings.expand))))
             }
 
         default:

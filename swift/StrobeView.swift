@@ -23,6 +23,7 @@
 
 
 import Cocoa
+import TunerState
 
 class StrobeView: TunerView
 {
@@ -34,17 +35,16 @@ class StrobeView: TunerView
 
     let kMaxColours = 3
 
-    @objc var c = 0.0
-    @objc var colour = 1
-    @objc var enable = false
+    var enable = false
     {
         didSet
         {
             isHidden = !enable
             needsDisplay = true
+            settings.strobe = enable
         }
     }
-    @objc var changed = false
+    var changed = false
 
     var foreground: NSColor!
     var background: NSColor!
@@ -74,6 +74,10 @@ class StrobeView: TunerView
         super.draw(dirtyRect)
 
         // Drawing code here.
+
+        // Cents from the display model, in semitones as before
+        let c = model.strobeCents / 100
+        let colour = settings.colour
 
         // Create patterns
         if (gradient == nil || changed)

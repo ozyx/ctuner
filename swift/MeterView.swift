@@ -22,23 +22,20 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Cocoa
+import TunerState
 
 // TunerView
 class MeterView: TunerView
 {
-    @objc var c = 0.0
-
-    var mc = 0.0
-
     // mouseDown
     override func mouseDown(with event: NSEvent)
     {
         if (event.type == .leftMouseDown)
         {
-            displayView.lock = !displayView.lock
+            model.isLocked = !model.isLocked
             if (lockBox != nil)
             {
-                lockBox.state = displayView.lock ? .on: .off
+                lockBox.state = model.isLocked ? .on: .off
             }
             displayView.needsDisplay = true
         }
@@ -49,9 +46,9 @@ class MeterView: TunerView
     {
         super.draw(dirtyRect)
 
-        // Do the inertia calculation, light enough to follow every
-        // measurement the audio code now sends
-        mc = ((mc * 3) + c) / 4
+        // The display model smooths the cents every hop, as this view
+        // used to every redraw
+        let cents = model.meterCents
 
         // Context
         let context = NSGraphicsContext.current!
@@ -107,7 +104,7 @@ class MeterView: TunerView
         NSBezierPath.fill(NSMakeRect(left, barY, right - left, barSize))
 
         // Nothing more to show without a note
-        if (displayView.f == 0)
+        if (model.reading == nil)
         {
             return
         }
@@ -115,12 +112,11 @@ class MeterView: TunerView
         // Draw the bar from the centre to the measured cents, green
         // when within 5 cents, grey once the reading is no longer live,
         // at least 3 points wide so it shows
-        let cents = mc * 100
         let x = centre + CGFloat(max(-50, min(50, cents))) * perCent
         let barWidth = max(abs(x - centre), 3)
         let barX = (cents < 0) ? centre - barWidth: centre
-        let inTune = abs(cents) <= 5
-        let stale = displayView.stale
+        let inTune = DisplayModel.inTune(cents)
+        let stale = model.isStale
         (stale ? NSColor.lightGray:
            inTune ? NSColor.systemGreen: NSColor.systemOrange).set()
         NSBezierPath.fill(NSMakeRect(barX, barY, barWidth, barSize))
