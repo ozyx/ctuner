@@ -27,6 +27,31 @@ import TunerState
 // TunerView
 class MeterView: TunerView
 {
+    // The font and its metrics, made again only when the text size
+    // changes, as looking up the font every redraw was most of the cost
+    var textSize: CGFloat = 0
+    var attribs: [NSAttributedString.Key: Any] = [:]
+    var textHeight: CGFloat = 0
+    var labelWidths: [String: CGFloat] = [:]
+
+    // What the last draw showed, so the timer can leave an unchanged
+    // meter alone
+    var shown: (Bool, Double, Bool)?
+
+    // What the meter would show now; the cents don't matter without a note
+    var showing: (Bool, Double, Bool)
+    {
+        let live = model.reading != nil
+        return (live, live ? model.meterCents: 0, model.isStale)
+    }
+
+    // changed
+    var changed: Bool
+    {
+        guard let shown = shown else {return true}
+        return shown != showing
+    }
+
     // mouseDown
     override func mouseDown(with event: NSEvent)
     {
@@ -49,26 +74,35 @@ class MeterView: TunerView
         // The display model smooths the cents every hop, as this view
         // used to every redraw
         let cents = model.meterCents
+        shown = showing
 
         // Context
         let context = NSGraphicsContext.current!
 
-        // Text, tick and bar sizes
-        let textSize = height / 5
+        // Tick and bar sizes
         let tickSize = height / 8
         let barSize = height / 5
 
         // Font, with fixed width digits so the numbers don't jitter
-        let font = NSFont.monospacedDigitSystemFont(ofSize: textSize,
-                                                    weight: .regular)
-        let attribs: [NSAttributedString.Key: Any] = [.font: font]
-        let textHeight = "0".size(withAttributes: attribs).height
+        if (textSize != height / 5)
+        {
+            textSize = height / 5
+            let font = NSFont.monospacedDigitSystemFont(ofSize: textSize,
+                                                        weight: .regular)
+            attribs = [.font: font]
+            textHeight = "0".size(withAttributes: attribs).height
+            labelWidths = [:]
+            for s in ["-50", "-25", "0", "+25", "+50"]
+            {
+                labelWidths[s] = s.size(withAttributes: attribs).width
+            }
+        }
 
         // Drawing code here.
         NSEraseRect(rect)
 
         // Scale runs from -50 to +50 cents, leaving room for the end labels
-        let margin = "-50".size(withAttributes: attribs).width / 2 + 4
+        let margin = labelWidths["-50"]! / 2 + 4
         let left = rect.minX + margin
         let right = rect.maxX - margin
         let centre = (left + right) / 2
@@ -80,7 +114,7 @@ class MeterView: TunerView
                        (25, "+25"), (50, "+50")]
         {
             let x = centre + CGFloat(v) * perCent
-            let offset = s.size(withAttributes: attribs).width / 2
+            let offset = labelWidths[s]! / 2
             s.draw(at: NSMakePoint(x - offset, labelY),
                    withAttributes: attribs)
         }

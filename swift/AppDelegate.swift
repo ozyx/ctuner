@@ -588,7 +588,10 @@ class AppDelegate: NSObject, NSApplicationDelegate
     // Update
     @objc func update()
     {
-        meterView.needsDisplay = true
+        if (meterView.changed)
+        {
+            meterView.needsDisplay = true
+        }
         strobeView.needsDisplay = true
     }
 
