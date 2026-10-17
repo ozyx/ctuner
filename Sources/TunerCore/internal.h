@@ -16,7 +16,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //  The engine handle and snapshot slot, shared by the core's files.
-//  Every field was a function-scope static in swift/Audio.m.
+//  Every field was a function-scope static in Reference/Audio.m.
 
 #ifndef TunerCoreInternal_h
 #define TunerCoreInternal_h
@@ -29,7 +29,7 @@
 
 #include "TunerCore.h"
 
-// Analysis constants, as in swift/Audio.h
+// Analysis constants, as in Reference/Audio.h
 #define kMin   0.5
 #define kScale 2048.0
 

@@ -26,6 +26,7 @@
 
 import Foundation
 import Observation
+import TunerCore
 
 @MainActor
 @Observable
@@ -42,9 +43,9 @@ public final class Settings
       0 ... Notes.translate.count - 1
     public nonisolated static let colourRange = 0 ... 2
 
-    // The note filter's two independent sets
-    public nonisolated static let noteCount = 12
-    public nonisolated static let octaveCount = 9
+    // The note filter's two independent sets, as wide as the core's masks
+    public nonisolated static let noteCount = Int(kTunerNotes)
+    public nonisolated static let octaveCount = Int(kTunerOctaves)
 
     // The keys this model writes
     private enum Key

@@ -24,8 +24,8 @@ import TunerCapture
 import TunerCore
 import TunerState
 
-// fourCharCode: a control tag from four characters, as Audio.h wrote
-// them
+// fourCharCode: a control tag from four characters, as the old Audio.h
+// wrote them
 func fourCharCode(_ code: String) -> Int
 {
     return code.utf8.reduce(0) { ($0 << 8) | Int($1) }
@@ -726,9 +726,7 @@ class AppDelegate: NSObject, NSApplicationDelegate
 		          "-2[Key:B\u{266D}]", "-3[Key:A]",
 		          "-4[Key:A\u{266D}]", "-5[Key:G]",
                           "-6[Key:F\u{266F}]"]
-        let kKeys = ["C", "C\u{266F}", "D", "E\u{266D}",
-                     "E", "F", "F\u{266F}", "G",
-                     "A\u{266D}", "A", "B\u{266D}", "B"]
+        let kKeys = zip(Notes.names, Notes.symbols).map {$0 + $1}
 
         let labels = ["Zoom spectrum", "Filter audio",
                       "Multiple notes", "Fundamental filter",

@@ -19,9 +19,10 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //  Note names, accidentals and the transpose table from
-//  swift/TunerView.swift, the reference constants from swift/Audio.h,
-//  and the copy-readout line. Transpose is display state only: it
-//  shifts the name and the staff position and never reaches the engine.
+//  swift/TunerView.swift, the reference constants from
+//  Reference/Audio.h, and the copy-readout line. Transpose is display
+//  state only: it shifts the name and the staff position and never
+//  reaches the engine.
 
 import Foundation
 
@@ -155,6 +156,6 @@ public struct Reading: Equatable, Sendable
         return String(format: "%@%@%d %+4.2lf\u{00A2} %4.2lfHz %4.2lfHz " +
                         "%4.2lfHz\n",
                       shown.name, shown.symbol, shown.octave, cents,
-                      reference, frequency, frequency - reference)
+                      reference, frequency, difference)
     }
 }

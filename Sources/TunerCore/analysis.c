@@ -18,7 +18,7 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  ProcessAudio from swift/Audio.m, line for line, with its statics in
+//  ProcessAudio from Reference/Audio.m, line for line, with its statics in
 //  the engine handle and its view writes replaced by snapshot fields.
 //  The engine always computes: locking the display is the UI's job, as
 //  are the decimation counters and the silence timer.

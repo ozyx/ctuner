@@ -17,9 +17,10 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  The 32 temperaments from swift/Temperaments.h, in the same order and
-//  with the same literals. Saved settings store a temperament by its
-//  row index, so the order is frozen: append, never insert or reorder.
+//  The 32 temperaments from Reference/Temperaments.h, in the same
+//  order and with the same literals. Saved settings store a
+//  temperament by its row index, so the order is frozen: append, never
+//  insert or reorder.
 //  Rows 6 and 7 are written in Hz rather than ratios; the engine only
 //  divides one entry of a row by another, so that is harmless.
 

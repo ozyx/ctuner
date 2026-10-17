@@ -18,7 +18,7 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  The input filter from InputProc in swift/Audio.m: a first-order
+//  The input filter from InputProc in Reference/Audio.m: a first-order
 //  Butterworth low-pass with its corner at 480 Hz.
 
 #pragma clang fp contract(off)

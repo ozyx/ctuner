@@ -18,9 +18,10 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  Stage 1 capture: today's AUHAL input unit from swift/Audio.m, with
-//  the dispatch, the log calls and the filter taken out of the input
-//  callback, which renders into a preallocated buffer and pushes it.
+//  Stage 1 capture: today's AUHAL input unit from Reference/Audio.m,
+//  with the dispatch, the log calls and the filter taken out of the
+//  input callback, which renders into a preallocated buffer and pushes
+//  it.
 
 #include <math.h>
 #include <stdatomic.h>
