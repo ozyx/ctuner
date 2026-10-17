@@ -182,6 +182,7 @@ struct DisplayModelTests
         #expect(model.reading?.reeds == kA4.reeds)
         #expect(model.markers?.frequency == 440.76)
         #expect(model.markers?.maxima == [440.76])
+        #expect(model.markers?.reeds == kA4.reeds)
         #expect(model.meterCents == meter)
         #expect(model.strobeCents == 3)
         #expect(model.staffNote(transpose: 6)?.text == "A4")

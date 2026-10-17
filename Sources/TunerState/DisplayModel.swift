@@ -69,8 +69,14 @@ public struct Markers: Equatable, Sendable
     public var lower: Double
     public var upper: Double
 
-    // One per multiple-reed row
+    // One per multiple-reed row, with the cents the spectrum labels
+    public var reeds: [Reed]
+
+    // The reeds' frequencies
     public var maxima: [Double]
+    {
+        return reeds.map { $0.frequency }
+    }
 }
 
 // What the readout shows
@@ -192,7 +198,7 @@ public final class DisplayModel
             live.markers = Markers(frequency: hop.frequency,
                                    reference: hop.reference,
                                    lower: hop.lower, upper: hop.upper,
-                                   maxima: hop.reeds.map { $0.frequency })
+                                   reeds: hop.reeds)
 
             // The text at once after blank or stale, then every 100 ms
             if live.reading == nil || live.stale ||
