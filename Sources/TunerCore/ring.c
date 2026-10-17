@@ -50,10 +50,13 @@ void RingWrite(Ring *ring, const float *data, int count) TUNER_NONBLOCKING
     uint64_t write = atomic_load_explicit(&ring->write, memory_order_relaxed);
     uint64_t read = atomic_load_explicit(&ring->read, memory_order_acquire);
 
-    // Drop a block that does not fit, whole, and count it
+    // Drop a block that does not fit, whole, count it and mark where
+    // it was; the release store of the next write orders the mark
+    // before the samples after it
     if (count > kRingLength - (int)(write - read))
     {
         atomic_fetch_add_explicit(&ring->overruns, 1, memory_order_relaxed);
+        atomic_store_explicit(&ring->gap, write, memory_order_relaxed);
         return;
     }
 

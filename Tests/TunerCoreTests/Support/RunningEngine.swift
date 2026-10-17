@@ -33,6 +33,8 @@ final class RunningEngine: @unchecked Sendable
     private var hopRecords: [ActualHop] = []
     private var hopBlocks: [[Double]] = []
     private var hopThreads: Set<UInt64> = []
+    private var holdAt: Int?
+    private let gate = DispatchSemaphore(value: 0)
 
     // init(rate:recording:)
     init(rate: Double = 44100, recording: Bool = false) throws
@@ -96,8 +98,27 @@ final class RunningEngine: @unchecked Sendable
             hopRecords.append(record)
             hopBlocks.append(block)
         }
+        let held = hopCount == holdAt
         condition.broadcast()
         condition.unlock()
+
+        // Stall the thread here, with the ring still filling
+        if held
+        {
+            gate.wait()
+        }
+    }
+
+    // hold: stall the analysis thread after the given hop until release
+    func hold(after count: Int)
+    {
+        locked { holdAt = count }
+    }
+
+    // release: let a held thread go on
+    func release()
+    {
+        gate.signal()
     }
 
     // wait: until at least count hops have run; false on timeout

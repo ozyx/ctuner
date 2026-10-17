@@ -129,6 +129,73 @@ struct RingTests
             #expect(problems.isEmpty, "block \(block): \(problems)")
         }
     }
+
+    // A gap reached with hops still queued before it resets the phase
+    // history at the first hop after the gap, as one reached with the
+    // ring empty does, so the two runs read the same hop for hop
+    @Test func resetsAtTheGap() throws
+    {
+        let fixture = try #require(Fixture.named("tone-00440.0"))
+        let samples = try fixture.samples()
+        let hops = try fixture.expected().count
+        let block = RingTests.block
+
+        // Stalled: the thread holds after block 0 while blocks 1 to 32
+        // fill the ring and 33 and 34 are dropped behind them
+        let stalled = try RunningEngine(recording: true)
+        stalled.hold(after: 1)
+        try stalled.start()
+
+        stalled.push(samples, 0 ..< block)
+        #expect(stalled.wait(hops: 1))
+        for hop in 1 ..< 35
+        {
+            stalled.push(samples, hop * block ..< (hop + 1) * block)
+        }
+        #expect(TunerEngineOverruns(stalled.engine) == 2)
+        stalled.release()
+
+        // Caught up: the thread has read every block before the gap,
+        // and a push too big for the ring leaves the gap in one place
+        let caughtUp = try RunningEngine(recording: true)
+        try caughtUp.start()
+
+        for hop in 0 ..< 33
+        {
+            caughtUp.push(samples, hop * block ..< (hop + 1) * block)
+            #expect(caughtUp.wait(hops: hop + 1))
+        }
+        caughtUp.push(samples, 0 ..< RingTests.ringLength + 1)
+        #expect(TunerEngineOverruns(caughtUp.engine) == 1)
+
+        for running in [stalled, caughtUp]
+        {
+            #expect(running.wait(hops: 33))
+            for hop in 35 ..< hops
+            {
+                running.push(samples, hop * block ..< (hop + 1) * block)
+                #expect(running.wait(hops: hop - 1))
+            }
+        }
+
+        let expected = caughtUp.records
+        let actual = stalled.records
+        try #require(actual.count == hops - 2 && expected.count == hops - 2)
+
+        for (k, (a, e)) in zip(actual, expected).enumerated()
+        {
+            #expect(identical(a, e), "record \(k): \(a) against \(e)")
+        }
+    }
+
+    // identical: two hops of the same input read the same, bit for bit
+    func identical(_ a: ActualHop, _ b: ActualHop) -> Bool
+    {
+        return a.found == b.found && a.note == b.note && a.count == b.count &&
+            a.imax == b.imax &&
+            [a.f, a.fr, a.c, a.max, a.sumsq].elementsEqual(
+                [b.f, b.fr, b.c, b.max, b.sumsq]) { close($0, $1, relative: 0) }
+    }
 }
 
 // SplitMix: a small seeded generator, so the sizes are the same on

@@ -38,16 +38,22 @@ static void *AnalysisThread(void *argument)
             break;
 
         // Catch up on every complete hop
-        while (RingRead(&e->ring, e->hop, kTunerBlock))
+        for (;;)
         {
+            uint64_t read = atomic_load_explicit(&e->ring.read,
+                                                 memory_order_relaxed);
+            if (!RingRead(&e->ring, e->hop, kTunerBlock))
+                break;
+
             // A dropped block leaves a gap in the input; take no phase
-            // difference across it
-            uint64_t overruns = TunerEngineOverruns(e);
-            if (overruns != e->seenOverruns)
-            {
+            // difference across it, at the hop that starts at or spans
+            // the gap however many hops were queued before it. Only the
+            // latest gap is kept, and the zero it starts at falls in
+            // the first hop, where there is no history to forget
+            uint64_t gap = atomic_load_explicit(&e->ring.gap,
+                                                memory_order_relaxed);
+            if (gap - read < kTunerBlock)
                 AnalysisReset(e);
-                e->seenOverruns = overruns;
-            }
 
             EngineProcessHop(e, e->hop, SnapshotBack(e));
             SnapshotPublish(e);

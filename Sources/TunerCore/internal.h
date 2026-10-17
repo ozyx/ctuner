@@ -84,12 +84,14 @@ typedef struct
 } SharedConfig;
 
 // Single-producer, single-consumer sample ring with free-running
-// indices (KTD4)
+// indices (KTD4). The producer counts each dropped block and records
+// the write index it was dropped at, the latest gap in the input
 typedef struct
 {
     alignas(kCacheLine) _Atomic(uint64_t) write;
     alignas(kCacheLine) _Atomic(uint64_t) read;
     alignas(kCacheLine) _Atomic(uint64_t) overruns;
+    _Atomic(uint64_t) gap;
     alignas(kCacheLine) float data[kRingLength];
 } Ring;
 
@@ -119,14 +121,13 @@ struct TunerEngine
     SharedConfig config;
     double temperaments[kTunerTemperaments][kTunerNotes];
 
-    // Thread: the ring it reads, the semaphore that wakes it, the
-    // overrun count it last saw and the hop it reads into
+    // Thread: the ring it reads, the semaphore that wakes it and the
+    // hop it reads into
     Ring ring;
     dispatch_semaphore_t wake;
     pthread_t thread;
     bool running;
     alignas(kCacheLine) _Atomic(bool) stop;
-    uint64_t seenOverruns;
     float hop[kTunerBlock];
     TunerHopCallback callback;
     void *context;
