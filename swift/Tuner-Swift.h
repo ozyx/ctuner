@@ -413,6 +413,7 @@ SWIFT_CLASS("_TtC5Tuner11DisplayView")
 @property (nonatomic) double c;
 @property (nonatomic) double f;
 @property (nonatomic) double fr;
+@property (nonatomic) BOOL stale;
 - (void)mouseDown:(NSEvent * _Nonnull)event;
 - (void)drawRect:(NSRect)dirtyRect;
 - (nonnull instancetype)initWithFrame:(NSRect)frameRect OBJC_DESIGNATED_INITIALIZER;

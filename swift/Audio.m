@@ -373,7 +373,8 @@ void (^ProcessAudio)(void) = ^
 {
     enum
     {kTimerCount = 64,
-     kDelayCount = 16};
+     kDelayCount = 16,
+     kDisplayCount = 4};
 
     // Arrays for processing input
     static double xa[kRange];
@@ -771,14 +772,18 @@ void (^ProcessAudio)(void) = ^
     {
         static long delay;
 
-	// If display not locked
-	if (!displayView.lock && (delay % kDelayCount) == 0)
+	// If display not locked, update the text about ten times a
+	// second, often enough to follow but slow enough to read, and
+	// straight away when a note follows a silence
+	if (!displayView.lock && ((delay % kDisplayCount) == 0 ||
+				  displayView.stale))
 	{
 	    // Update the display struct
 	    displayView.f = f;
 	    displayView.fr = fr;
 	    displayView.c = c;
 	    displayView.n = note;
+	    displayView.stale = false;
 	    disp.count = count;
 
 	    // Update display
@@ -786,7 +791,12 @@ void (^ProcessAudio)(void) = ^
 
 	    // Update staff
 	    staffView.note = note;
+	}
 
+	// If display not locked, give the meter and strobe every
+	// measurement; they redraw on their own timer
+	if (!displayView.lock)
+	{
 	    // Update meter
 	    meterView.c = c;
 
@@ -810,22 +820,16 @@ void (^ProcessAudio)(void) = ^
 
 	    if (timer == kTimerCount)
 	    {
-		displayView.f = 0.0;
-		displayView.fr = 0.0;
-		displayView.c = 0.0;
-		displayView.n = 0;
+		// Keep the last reading on the display, staff and
+		// meter, greyed out, rather than resetting them to a
+		// note that wasn't played
+		displayView.stale = true;
 		disp.count = 0;
 
 		// Update display
                 displayView.needsDisplay = true;
 
-		// Update staff
-		staffView.note = 0;
-
-		// Update meter
-		meterView.c = 0.0;
-
-		// Update strobe
+		// Stop the strobe, its motion means a live note
 		strobeView.c = 0.0;
 
 		// Update spectrum

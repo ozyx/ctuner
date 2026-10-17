@@ -30,6 +30,7 @@ class DisplayView: TunerView
     @objc var c = 0.0
     @objc var f = 0.0
     @objc var fr = 0.0
+    @objc var stale = false
 
     let kTextSize: CGFloat = 12
 
@@ -170,7 +171,8 @@ class DisplayView: TunerView
             }
         }
 
-        else
+        // Leave the display blank until the first note
+        else if (f > 0)
         {
             var s = ""
             var x = rect.minX + 2
@@ -192,6 +194,7 @@ class DisplayView: TunerView
 
 	    s = String(format: "%d", n / kOctave) 
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
+            var noteRight = x + s.size(withAttributes: attribs).width
 
 	    // Select font
             font = NSFont.boldSystemFont(ofSize: textSizeLarger / 2)
@@ -202,48 +205,66 @@ class DisplayView: TunerView
                                     kOctave) % sharps.endIndex])
             s.draw(at: NSMakePoint(x, y + textSizeLarger / 2),
                    withAttributes: attribs)
+            noteRight = max(noteRight, x + s.size(withAttributes: attribs).width)
 
-	    // Select font
-            font = NSFont.boldSystemFont(ofSize: textSizeLarge)
+	    // Select font, as large as fits beside the note, sized for the
+            // widest frequency so it doesn't jump about between notes
+            let room = rect.maxX - noteRight - 8
+            var size = textSizeLarge
+            font = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .bold)
             attribs = [.font: font]
-            let dx = "-50.00\u{00A2}".size(withAttributes: attribs).width
-            if (dx >= width / 2)
+            var dx = "0000.00 Hz".size(withAttributes: attribs).width
+            if (dx > room)
             {
-                let expansion = log((width / 2) / dx)
-                attribs = [.font: font, .expansion: expansion]
+                size *= room / dx
+                font = NSFont.monospacedDigitSystemFont(ofSize: size,
+                                                        weight: .bold)
+                attribs = [.font: font]
             }
 
-            // Right justify
-	    s = String(format: "%+4.2f\u{00A2}", c * 100.0)
+            // Right justify the measured frequency
+	    s = String(format: "%.2f Hz", f)
             x = rect.maxX - s.size(withAttributes: attribs).width - 2
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
 
-	    // Select font
-            font = NSFont.boldSystemFont(ofSize: textSizeMedium)
+	    // Select font, shrinking it if the row won't fit
+            size = textSizeMedium
+            font = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .bold)
             attribs = [.font: font]
+            dx = "target 0000.00 Hz".size(withAttributes: attribs).width +
+              "+000.00 Hz".size(withAttributes: attribs).width
+            if (dx > width - 16)
+            {
+                size *= (width - 16) / dx
+                font = NSFont.monospacedDigitSystemFont(ofSize: size,
+                                                        weight: .bold)
+                attribs = [.font: font]
+            }
 
 	    y -= textSizeMedium + 4
             x = rect.minX + 2
 
-	    s = String(format: "%4.2lfHz", fr)
+	    s = String(format: "target %.2f Hz", fr)
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
 
             // Right justify
-	    s = String(format: "%4.2lfHz", f)
+	    s = String(format: "%+.2f Hz", f - fr)
             x = rect.maxX - s.size(withAttributes: attribs).width - 2
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
 
 	    y -= textSizeMedium
             x = rect.minX + 2
 
-	    s = String(format: "%4.2lfHz", (audio.reference == 0) ?
+	    s = String(format: "A4 = %.2f Hz", (audio.reference == 0) ?
 		    kA5Reference : audio.reference)
             s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
+        }
 
-            // Right justify
-	    s = String(format: "%+4.2lfHz", f - fr)
-            x = rect.maxX - s.size(withAttributes: attribs).width - 2
-            s.draw(at: NSMakePoint(x, y), withAttributes: attribs)
+        // Grey out a reading that is no longer live
+        if (stale)
+        {
+            NSColor(white: 1, alpha: 0.6).set()
+            NSBezierPath.fill(rect)
         }
 
         // Display L if locked
