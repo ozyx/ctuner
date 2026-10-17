@@ -96,7 +96,7 @@ public struct CaptureError: Error, Sendable
     public let message: String
 
     // init
-    init(_ status: CaptureStatus)
+    public init(_ status: CaptureStatus)
     {
         message = String(cString: CaptureStatusString(status))
     }
@@ -188,19 +188,20 @@ public final class CaptureController
         }
     }
 
-    // activate: the app became active; checks the permission again,
-    // so a grant made in System Settings starts capture (R30)
+    // activate: the app became active; checks the permission and the
+    // input again, so a grant or an input chosen in System Settings
+    // starts capture (R30, R31)
     public func activate()
     {
         switch state
         {
-        case .stopped, .denied, .failed:
+        case .stopped, .denied, .noDevice, .failed:
             if visible
             {
                 begin()
             }
 
-        case .requesting, .noDevice, .running:
+        case .requesting, .running:
             break
         }
     }
@@ -273,6 +274,14 @@ public final class CaptureController
     // startCapture: a core at the input's rate, then the input into it
     private func startCapture()
     {
+        // Nothing starts while the window is hidden, whichever event
+        // asked; showing it starts capture again (R34)
+        guard visible else
+        {
+            state = .stopped
+            return
+        }
+
         let rate = backend.inputSampleRate
         guard rate > 0 else
         {
@@ -365,11 +374,11 @@ public final class CaptureController
     {
         switch state
         {
-        case .running, .noDevice:
+        case .running, .noDevice, .failed:
             stopCapture()
             startCapture()
 
-        case .stopped, .requesting, .denied, .failed:
+        case .stopped, .requesting, .denied:
             break
         }
     }

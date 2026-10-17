@@ -21,6 +21,7 @@
 
 import Foundation
 import Testing
+import TunerCapture
 import TunerState
 
 // A backend whose permission and input the test sets
@@ -35,6 +36,9 @@ private final class FakeBackend: CaptureBackend
     var requests = 0
     var running: Engine?
     var pendingRequest: (@MainActor (Bool) -> Void)?
+
+    // Thrown by the next start, when set
+    var failStart: CaptureError?
 
     // requestPermission: held until the test answers
     func requestPermission(_ done: @escaping @MainActor (Bool) -> Void)
@@ -55,6 +59,11 @@ private final class FakeBackend: CaptureBackend
     // start
     func start(_ engine: Engine) throws(CaptureError)
     {
+        if let failStart
+        {
+            throw failStart
+        }
+
         running = engine
     }
 
@@ -324,5 +333,141 @@ struct CaptureControllerTests
         rig.controller.activate()
         #expect(rig.controller.state == .stopped)
         #expect(rig.backend.running == nil)
+    }
+
+    @Test func aDeviceThatAppearsWhileHiddenWaitsForTheWindow()
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        rig.backend.inputSampleRate = 0
+        rig.controller.activate()
+        #expect(rig.controller.state == .noDevice)
+
+        // Hidden past the debounce, then a device appears
+        rig.controller.setVisible(false)
+        rig.clock.advance(CaptureController.pauseAfter)
+        rig.backend.inputSampleRate = 48000
+        rig.backend.change()
+        #expect(rig.controller.state == .stopped)
+        #expect(rig.backend.running == nil)
+
+        rig.controller.setVisible(true)
+        #expect(rig.controller.state == .running(48000))
+    }
+
+    @Test func allowWhileHiddenWaitsForTheWindow()
+    {
+        let rig = Rig()
+        rig.controller.activate()
+        #expect(rig.controller.state == .requesting)
+
+        // Hidden past the debounce, then Allow
+        rig.controller.setVisible(false)
+        rig.clock.advance(CaptureController.pauseAfter)
+        rig.backend.answer(true)
+        #expect(rig.controller.state == .stopped)
+        #expect(rig.backend.running == nil)
+
+        rig.controller.setVisible(true)
+        #expect(rig.controller.state == .running(44100))
+    }
+
+    @Test func activationFindsAnInputChosenInSettings()
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        rig.backend.inputSampleRate = 0
+        rig.controller.activate()
+        #expect(rig.controller.state == .noDevice)
+
+        // Back from Sound settings with an input chosen
+        rig.backend.inputSampleRate = 44100
+        rig.controller.activate()
+        #expect(rig.controller.state == .running(44100))
+    }
+
+    @Test func aFailedStartShowsWhyAndActivationRetries()
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        let error = CaptureError(kCaptureStatusStart)
+        rig.backend.failStart = error
+
+        rig.controller.activate()
+        #expect(rig.controller.state == .failed(error.message))
+        #expect(rig.controller.engine == nil)
+        #expect(rig.settings.engine == nil)
+        #expect(rig.backend.running == nil)
+
+        rig.backend.failStart = nil
+        rig.controller.activate()
+        #expect(rig.controller.state == .running(44100))
+    }
+
+    @Test func hopsReachTheDisplayModel() async throws
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        rig.controller.activate()
+        let engine = try #require(rig.backend.running)
+
+        var snapshots = 0
+        rig.controller.onSnapshot = { _ in snapshots += 1 }
+
+        // One second of A4, a block at a time, letting hops post
+        let samples = sine()
+        for start in stride(from: 0, to: samples.count - 1024 + 1, by: 1024)
+        {
+            samples[start ..< start + 1024].withUnsafeBufferPointer
+            {
+                engine.push($0)
+            }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+
+        let deadline = Date.now.addingTimeInterval(10)
+        while rig.model.reading?.note != 57 && Date.now < deadline
+        {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(rig.model.phase == .live)
+        #expect(rig.model.reading?.note == 57)
+        #expect(snapshots > 0)
+    }
+
+    @Test func hopsFromAReplacedCoreAreDropped() async throws
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        rig.controller.activate()
+        let engine = try #require(rig.backend.running)
+
+        // Enough A4 for found hops, analysed while the main actor is
+        // held, so every post from this core is still queued
+        let samples = sine()
+        for start in stride(from: 0, to: 30 * 1024, by: 1024)
+        {
+            samples[start ..< start + 1024].withUnsafeBufferPointer
+            {
+                engine.push($0)
+            }
+        }
+        usleep(500_000)
+
+        // A device change replaces the core before those posts run
+        rig.backend.change()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(rig.model.phase == .blank)
+        #expect(rig.model.reading == nil)
+    }
+}
+
+// sine: one second of A4 at 44100 Hz
+private func sine() -> [Float]
+{
+    return (0 ..< 44100).map
+    {
+        Float(0.5 * sin(2 * Double.pi * 440 * Double($0) / 44100))
     }
 }
