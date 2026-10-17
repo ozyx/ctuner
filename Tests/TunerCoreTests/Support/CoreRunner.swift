@@ -65,15 +65,22 @@ struct CoreConfig
     }
 }
 
-// runCore: one ActualHop per 1024-sample block of the input
-func runCore(samples: [Float], config: CoreConfig) throws -> [ActualHop]
+// createEngine: an engine at a rate with today's temperament table
+func createEngine(rate: Double) throws -> OpaquePointer
 {
     var engine: OpaquePointer?
     let status = Temperaments.flattened.withUnsafeBufferPointer
     {
-        TunerEngineCreate(config.rate, $0.baseAddress, &engine)
+        TunerEngineCreate(rate, $0.baseAddress, &engine)
     }
     try #require(status == kTunerStatusOK)
+    return try #require(engine)
+}
+
+// runCore: one ActualHop per 1024-sample block of the input
+func runCore(samples: [Float], config: CoreConfig) throws -> [ActualHop]
+{
+    let engine = try createEngine(rate: config.rate)
     defer { TunerEngineDestroy(engine) }
 
     let slot = try #require(TunerSlotCreate())
