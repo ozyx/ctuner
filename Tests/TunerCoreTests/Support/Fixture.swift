@@ -31,6 +31,7 @@ struct ExpectedMaximum: Equatable
 // One expected line: the frozen engine's output for one hop
 struct ExpectedHop
 {
+    let line: String
     let hop: Int
     let found: Bool
     let note: Int
@@ -170,6 +171,7 @@ extension ExpectedHop
             return value
         }
 
+        self.line = line
         hop = try int(0)
         found = try int(1) != 0
         note = try int(2)
