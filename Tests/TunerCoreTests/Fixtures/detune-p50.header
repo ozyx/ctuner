@@ -1,0 +1,8 @@
+name detune-p50
+expect_hz 452.8929841231365
+same_binary_only 1
+signal --tone 452.8929841231365:0.5:0
+hops 64
+block 1024
+input_bytes 262144
+input_hash c8cf5fda8aedb912

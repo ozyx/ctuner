@@ -1,0 +1,6 @@
+name silence
+signal
+hops 64
+block 1024
+input_bytes 262144
+input_hash 9c735bed0a722325

@@ -1,0 +1,9 @@
+name down-harmonic-027.5
+down 1
+expect_hz 27.5
+expect_cents 3
+signal --harmonic 27.5:0.5:5
+hops 64
+block 1024
+input_bytes 262144
+input_hash a7ebb91974e504dc

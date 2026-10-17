@@ -1,0 +1,8 @@
+name note-octave-4
+note 1
+octaves 010
+signal --harmonic 220:0.5:5
+hops 64
+block 1024
+input_bytes 262144
+input_hash 89f5d5ec84e58b7e

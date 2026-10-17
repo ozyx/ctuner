@@ -1,0 +1,7 @@
+name tone-04000.0
+expect_hz 4000
+signal --tone 4000:0.5:0
+hops 64
+block 1024
+input_bytes 262144
+input_hash 015d82651fe8d4f2
