@@ -30,7 +30,7 @@
 
 #include "internal.h"
 
-#define Length(a) (sizeof(a) / sizeof(a[0]))
+#define Length(a) ((int)(sizeof(a) / sizeof(a[0])))
 
 // AnalysisInit
 void AnalysisInit(TunerEngine *e)
