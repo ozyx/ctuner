@@ -192,10 +192,14 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
     // Find maximum value, and list of maxima
     for (int i = 1; i < limit; i++)
     {
-        // Clear maxima
-        maxima[count].f  = 0.0;
-        maxima[count].fr = 0.0;
-        maxima[count].n  = 0;
+        // Clear the next maximum, if there is room for one; today's
+        // engine wrote one past the list once it was full
+        if (count < kTunerMaxima)
+        {
+            maxima[count].f  = 0.0;
+            maxima[count].fr = 0.0;
+            maxima[count].n  = 0;
+        }
 
         // Cents relative to reference
         double cf = -12.0 * log2(e->reference / xf[i]);
