@@ -24,6 +24,7 @@ make test                   # swift test, debug
 make test-release           # swift test, release (the shipped optimisation level)
 make sanitize               # address+undefined, then thread
 make core-check             # the core warning-free under -Wall -Wextra, no Cocoa/ObjC/logging symbols
+make core-leaks             # the engine's start/stop/destroy lifecycle 100 times under leaks
 make build                  # release build of every product
 make fixtures               # rewrite the golden fixtures from the frozen engine
 make fixture-screen         # check every fixture holds across builds and sanitizers

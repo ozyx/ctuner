@@ -29,7 +29,7 @@ COREOBJECTS = $(patsubst $(CORE)/%.c,$(COREBUILD)/%.o,$(CORESOURCES))
 CORECFLAGS = -O2 -Wall -Wextra -Werror -I$(CORE)/include
 FORBIDDEN = '_objc_|_OBJC_|_NS|_CF|_os_log|_syslog|_asl_|printf|_puts|_fputs|_putchar|_fwrite|_perror'
 
-.PHONY: build test test-release sanitize core-check fixtures fixture-screen clean
+.PHONY: build test test-release sanitize core-check core-leaks fixtures fixture-screen clean
 
 build:
 	$(SWIFT) build -c release
@@ -52,6 +52,13 @@ core-check: $(COREOBJECTS)
 	@if nm -u $(COREOBJECTS) | grep -E $(FORBIDDEN); then \
 		echo "core-check: the core needs a forbidden symbol"; exit 1; fi
 	@echo "core-check: clean"
+
+# The engine's lifecycle a hundred times under leaks; it exits non-zero
+# when anything leaks
+core-leaks: $(COREOBJECTS)
+	clang -g -I$(CORE)/include Scripts/core-leaks.c $(COREOBJECTS) \
+		-framework Accelerate -o $(COREBUILD)/core-leaks
+	MallocStackLogging=1 leaks --atExit -- $(COREBUILD)/core-leaks
 
 $(COREBUILD)/%.o: $(CORE)/%.c $(wildcard $(CORE)/*.h $(CORE)/include/*.h)
 	@mkdir -p $(COREBUILD)

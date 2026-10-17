@@ -22,6 +22,10 @@
 #define TunerCoreInternal_h
 
 #include <Accelerate/Accelerate.h>
+#include <dispatch/dispatch.h>
+#include <pthread.h>
+#include <stdalign.h>
+#include <stdatomic.h>
 
 #include "TunerCore.h"
 
@@ -39,6 +43,55 @@ enum
     kOctave = 12,
     kEqual = 8
 };
+
+// Threading constants: the ring holds 32 hops, and atomics written by
+// different threads sit 128 bytes apart, the cache line on this Mac
+enum
+{
+    kRingLength = 32768,
+    kCacheLine = 128,
+    kSlots = 3,
+    kDirty = 4
+};
+
+// Configuration as one hop sees it
+typedef struct
+{
+    double reference;
+    int temperament;
+    int key;
+    bool filter;
+    bool downsample;
+    bool fundamental;
+    bool noteFilter;
+    uint32_t notes;
+    uint32_t octaves;
+} Config;
+
+// Configuration as the UI writes it: relaxed atomics, read once at the
+// start of each hop (KTD6)
+typedef struct
+{
+    _Atomic(double) reference;
+    _Atomic(int) temperament;
+    _Atomic(int) key;
+    _Atomic(bool) filter;
+    _Atomic(bool) downsample;
+    _Atomic(bool) fundamental;
+    _Atomic(bool) noteFilter;
+    _Atomic(uint32_t) notes;
+    _Atomic(uint32_t) octaves;
+} SharedConfig;
+
+// Single-producer, single-consumer sample ring with free-running
+// indices (KTD4)
+typedef struct
+{
+    alignas(kCacheLine) _Atomic(uint64_t) write;
+    alignas(kCacheLine) _Atomic(uint64_t) read;
+    alignas(kCacheLine) _Atomic(uint64_t) overruns;
+    alignas(kCacheLine) float data[kRingLength];
+} Ring;
 
 // Input filter state: the one-pole Butterworth low-pass from InputProc
 typedef struct
@@ -61,18 +114,30 @@ struct TunerSlot
 // The engine
 struct TunerEngine
 {
-    // Configuration
+    // Configuration; the table is fixed at create
     double sampleRate;
-    double reference;
-    int temperament;
-    int key;
-    bool filter;
-    bool downsample;
-    bool fundamental;
-    bool noteFilter;
-    uint32_t notes;
-    uint32_t octaves;
+    SharedConfig config;
     double temperaments[kTunerTemperaments][kTunerNotes];
+
+    // Thread: the ring it reads, the semaphore that wakes it, the
+    // overrun count it last saw and the hop it reads into
+    Ring ring;
+    dispatch_semaphore_t wake;
+    pthread_t thread;
+    bool running;
+    alignas(kCacheLine) _Atomic(bool) stop;
+    uint64_t seenOverruns;
+    float hop[kTunerBlock];
+    TunerHopCallback callback;
+    void *context;
+
+    // Triple buffer (KTD5): the analysis thread owns the back slot,
+    // the consumer the front, and the middle index carries the dirty
+    // bit between them
+    TunerSlot slots[kSlots];
+    int back;
+    int front;
+    alignas(kCacheLine) _Atomic(int) middle;
 
     // Rate-derived constants
     double fps;
@@ -103,6 +168,23 @@ struct TunerEngine
     FFTSetupD setup;
 };
 
+// Configuration
+void ConfigInit(SharedConfig *config);
+void ConfigLoad(SharedConfig *shared, Config *config);
+
+// Ring
+void RingWrite(Ring *ring, const float *data, int count) TUNER_NONBLOCKING;
+bool RingRead(Ring *ring, float *data, int count);
+
+// Snapshots
+void SnapshotInit(TunerEngine *engine);
+TunerSlot *SnapshotBack(TunerEngine *engine);
+void SnapshotPublish(TunerEngine *engine);
+
+// One hop through the filter, the window and the analysis into a slot
+void EngineProcessHop(TunerEngine *engine, const float *block,
+                      TunerSlot *slot);
+
 // Filter
 void FilterInit(Filter *filter, double sampleRate);
 void FilterBlock(Filter *filter, bool enabled, const float *data, int count,
@@ -110,6 +192,7 @@ void FilterBlock(Filter *filter, bool enabled, const float *data, int count,
 
 // Analysis
 void AnalysisInit(TunerEngine *engine);
-void AnalysisRun(TunerEngine *engine, TunerSlot *slot);
+void AnalysisReset(TunerEngine *engine);
+void AnalysisRun(TunerEngine *engine, const Config *config, TunerSlot *slot);
 
 #endif /* TunerCoreInternal_h */

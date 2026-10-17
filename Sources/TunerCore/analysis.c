@@ -42,8 +42,16 @@ void AnalysisInit(TunerEngine *e)
     vDSP_hamm_windowD(e->window, kTunerSamples, 0);
 }
 
+// AnalysisReset
+void AnalysisReset(TunerEngine *e)
+{
+    // Forget the phase history, as at create, so the hop after a gap
+    // does not take a phase difference across it
+    memset(e->xp, 0, sizeof(e->xp));
+}
+
 // AnalysisRun
-void AnalysisRun(TunerEngine *e, TunerSlot *slot)
+void AnalysisRun(TunerEngine *e, const Config *cfg, TunerSlot *slot)
 {
     double *xa = e->xa;
     double *xp = e->xp;
@@ -127,7 +135,7 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
     memmove(xp, xq, kTunerRange * sizeof(double));
 
     // Downsample
-    if (e->downsample)
+    if (cfg->downsample)
     {
         // x2 = xa << 2
         for (int i = 0; i < Length(e->x2); i++)
@@ -210,7 +218,7 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
             continue;
 
         // Cents relative to reference
-        double cf = -12.0 * log2(e->reference / xf[i]);
+        double cf = -12.0 * log2(cfg->reference / xf[i]);
         int note = round(cf) + kC5Offset;
 
         // Ignore negative
@@ -218,12 +226,12 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
             continue;
 
         // Fundamental filter
-        if ((e->fundamental) && (count > 0) &&
+        if ((cfg->fundamental) && (count > 0) &&
             ((note % kOctave) != (maxima[0].n % kOctave)))
             continue;
 
         // Note filter
-        if (e->noteFilter)
+        if (cfg->noteFilter)
         {
             // Get note and octave
             int n = note % kOctave;
@@ -234,8 +242,8 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
                 continue;
 
             // Ignore if filtered
-            if (!((e->notes >> n) & 1) ||
-                !((e->octaves >> o) & 1))
+            if (!((cfg->notes >> n) & 1) ||
+                !((cfg->octaves >> o) & 1))
                 continue;
         }
 
@@ -251,13 +259,13 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
             maxima[count].n = note;
 
             // Octave note number
-            int n = (note - e->key + kOctave) % kOctave;
+            int n = (note - cfg->key + kOctave) % kOctave;
             // A note number
-            int a = (kAOffset - e->key + kOctave) % kOctave;
+            int a = (kAOffset - cfg->key + kOctave) % kOctave;
 
             // Temperament ratio
-            double temperRatio = e->temperaments[e->temperament][n] /
-                e->temperaments[e->temperament][a];
+            double temperRatio = e->temperaments[cfg->temperament][n] /
+                e->temperaments[cfg->temperament][a];
             // Equal ratio
             double equalRatio = e->temperaments[kEqual][n] /
                 e->temperaments[kEqual][a];
@@ -266,11 +274,11 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
             double temperAdjust = temperRatio / equalRatio;
 
             // Reference note
-            maxima[count].fr = e->reference *
+            maxima[count].fr = cfg->reference *
                 pow(2.0, round(cf) / 12.0) * temperAdjust;
 
             // Set limit to octave above
-            if (!e->downsample && (limit > i * 2))
+            if (!cfg->downsample && (limit > i * 2))
                 limit = i * 2 - 1;
 
             count++;
@@ -291,14 +299,14 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
 
     // Do the note and cents calculations
     // Frequency
-    if (max > kMin && !e->downsample)
+    if (max > kMin && !cfg->downsample)
         f = maxima[0].f;
 
     // No candidate: today's engine went on to convert infinite or NaN
     // cents to int and index before a temperament row; only a positive
     // frequency on a non-negative note reaches the calculations
     double cf = (max > kMin && f > 0.0)?
-        -12.0 * log2(e->reference / f): 0.0;
+        -12.0 * log2(cfg->reference / f): 0.0;
 
     if (max > kMin && f > 0.0 && round(cf) + kC5Offset >= 0)
     {
@@ -308,13 +316,13 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
         note = round(cf) + kC5Offset;
 
         // Octave note number
-        int n = (note - e->key + kOctave) % kOctave;
+        int n = (note - cfg->key + kOctave) % kOctave;
         // A note number
-        int a = (kAOffset - e->key + kOctave) % kOctave;
+        int a = (kAOffset - cfg->key + kOctave) % kOctave;
 
         // Temperament ratio
-        double temperRatio = e->temperaments[e->temperament][n] /
-            e->temperaments[e->temperament][a];
+        double temperRatio = e->temperaments[cfg->temperament][n] /
+            e->temperaments[cfg->temperament][a];
         // Equal ratio
         double equalRatio = e->temperaments[kEqual][n] /
             e->temperaments[kEqual][a];
@@ -323,12 +331,12 @@ void AnalysisRun(TunerEngine *e, TunerSlot *slot)
         double temperAdjust = temperRatio / equalRatio;
 
         // Reference note
-        fr = e->reference * pow(2.0, round(cf) / 12.0) * temperAdjust;
+        fr = cfg->reference * pow(2.0, round(cf) / 12.0) * temperAdjust;
 
         // Lower and upper freq
-        fl = e->reference * pow(2.0, (round(cf) - 0.60) /
+        fl = cfg->reference * pow(2.0, (round(cf) - 0.60) /
                                 12.0) * temperAdjust;
-        fh = e->reference * pow(2.0, (round(cf) + 0.60) /
+        fh = cfg->reference * pow(2.0, (round(cf) + 0.60) /
                                 12.0) * temperAdjust;
 
         // Find nearest maximum to reference note

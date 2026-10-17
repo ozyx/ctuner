@@ -31,6 +31,17 @@
 extern "C" {
 #endif
 
+// Marks a function the real-time audio thread may call; clang checks
+// what such a function calls where it knows the attribute
+#if defined(__has_attribute)
+#if __has_attribute(nonblocking)
+#define TUNER_NONBLOCKING __attribute__((nonblocking))
+#endif
+#endif
+#ifndef TUNER_NONBLOCKING
+#define TUNER_NONBLOCKING
+#endif
+
 // Sizes
 enum
 {
@@ -63,7 +74,8 @@ typedef struct
     int n;
 } TunerMaximum;
 
-// A view of one snapshot. The pointers point into the slot that holds
+// A view of one snapshot. The sequence counts hops from 1, so 0 means
+// no hop has been published yet. The pointers point into the slot that holds
 // the snapshot and stay valid only as long as that slot is not reused.
 typedef struct
 {
@@ -88,16 +100,22 @@ typedef struct
 typedef struct TunerEngine TunerEngine;
 typedef struct TunerSlot TunerSlot;
 
+// Called on the analysis thread after each hop is published
+typedef void (*TunerHopCallback)(void *context);
+
 // Status string
 const char *TunerStatusString(TunerStatus status);
 
 // Create an engine at a sample rate with a temperament table of
-// kTunerTemperaments rows of kTunerNotes ratios, copied at create
+// kTunerTemperaments rows of kTunerNotes ratios, copied at create.
+// Destroy stops the analysis thread if it is running; stop capture
+// first, so nothing pushes into a freed engine.
 TunerStatus TunerEngineCreate(double sampleRate, const double *temperaments,
                               TunerEngine **engine);
 void TunerEngineDestroy(TunerEngine *engine);
 
-// Configuration
+// Configuration, safe to set from any thread; each hop reads it once
+// as it starts
 void TunerEngineSetReference(TunerEngine *engine, double reference);
 void TunerEngineSetTemperament(TunerEngine *engine, int temperament);
 void TunerEngineSetKey(TunerEngine *engine, int key);
@@ -108,8 +126,27 @@ void TunerEngineSetNoteFilter(TunerEngine *engine, bool noteFilter);
 void TunerEngineSetNoteMask(TunerEngine *engine, uint32_t notes);
 void TunerEngineSetOctaveMask(TunerEngine *engine, uint32_t octaves);
 
+// Start the analysis thread, which runs one pass for each complete
+// kTunerBlock samples pushed and publishes it, then calls the callback
+// if there is one. Stop returns once the thread has exited.
+TunerStatus TunerEngineStart(TunerEngine *engine, TunerHopCallback callback,
+                             void *context);
+void TunerEngineStop(TunerEngine *engine);
+
+// Copy samples into the ring and wake the analysis thread; from the
+// audio thread, which is its one producer. A push that does not fit
+// is dropped whole and counted as an overrun.
+void TunerEnginePush(TunerEngine *engine, const float *samples,
+                     int count) TUNER_NONBLOCKING;
+uint64_t TunerEngineOverruns(TunerEngine *engine);
+
+// View the newest published snapshot; from one consumer thread only.
+// Returns true when it is newer than the last one acquired. The view's
+// pointers stay valid until the next acquire.
+bool TunerEngineAcquire(TunerEngine *engine, TunerSnapshot *snapshot);
+
 // Process one block of kTunerBlock samples on the caller's thread into
-// a slot
+// a slot, bypassing the ring; not while the analysis thread runs
 TunerStatus TunerEngineProcessBlock(TunerEngine *engine, const float *block,
                                     TunerSlot *slot);
 

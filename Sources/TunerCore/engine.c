@@ -15,7 +15,7 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  The engine handle: lifecycle, configuration and the block entry.
+//  The engine handle: lifecycle and the block entry.
 
 #include <stdlib.h>
 #include <string.h>
@@ -60,13 +60,19 @@ TunerStatus TunerEngineCreate(double sampleRate, const double *temperaments,
         return kTunerStatusFFTSetup;
     }
 
+    e->wake = dispatch_semaphore_create(0);
+    if (e->wake == NULL)
+    {
+        vDSP_destroy_fftsetupD(e->setup);
+        free(e);
+        return kTunerStatusNoMemory;
+    }
+
     e->sampleRate = sampleRate;
-    e->reference = 440.0;
-    e->temperament = kEqual;
-    e->notes = (1u << kTunerNotes) - 1;
-    e->octaves = (1u << kTunerOctaves) - 1;
     memcpy(e->temperaments, temperaments, sizeof(e->temperaments));
 
+    ConfigInit(&e->config);
+    SnapshotInit(e);
     FilterInit(&e->inputFilter, sampleRate);
     AnalysisInit(e);
 
@@ -80,107 +86,38 @@ void TunerEngineDestroy(TunerEngine *engine)
     if (engine == NULL)
         return;
 
+    TunerEngineStop(engine);
+
+    dispatch_release(engine->wake);
     vDSP_destroy_fftsetupD(engine->setup);
     free(engine);
 }
 
-// TunerEngineSetReference
-void TunerEngineSetReference(TunerEngine *engine, double reference)
+// EngineProcessHop
+void EngineProcessHop(TunerEngine *engine, const float *block, TunerSlot *slot)
 {
-    engine->reference = reference;
-}
+    // One reading of the configuration for the whole hop
+    Config config;
+    ConfigLoad(&engine->config, &config);
 
-// TunerEngineSetTemperament
-void TunerEngineSetTemperament(TunerEngine *engine, int temperament)
-{
-    // Clamp, so a bad saved index cannot read outside the table
-    if (temperament < 0)
-        temperament = 0;
-    if (temperament >= kTunerTemperaments)
-        temperament = kTunerTemperaments - 1;
+    // Slide the window by one block, then filter the block in
+    // sample order onto its end
+    memmove(engine->buffer, engine->buffer + kTunerBlock,
+            (kTunerSamples - kTunerBlock) * sizeof(double));
+    FilterBlock(&engine->inputFilter, config.filter, block, kTunerBlock,
+                engine->buffer + kTunerSamples - kTunerBlock);
 
-    engine->temperament = temperament;
-}
-
-// TunerEngineSetKey
-void TunerEngineSetKey(TunerEngine *engine, int key)
-{
-    engine->key = key;
-}
-
-// TunerEngineSetFilter
-void TunerEngineSetFilter(TunerEngine *engine, bool filter)
-{
-    engine->filter = filter;
-}
-
-// TunerEngineSetDownsample
-void TunerEngineSetDownsample(TunerEngine *engine, bool downsample)
-{
-    engine->downsample = downsample;
-}
-
-// TunerEngineSetFundamental
-void TunerEngineSetFundamental(TunerEngine *engine, bool fundamental)
-{
-    engine->fundamental = fundamental;
-}
-
-// TunerEngineSetNoteFilter
-void TunerEngineSetNoteFilter(TunerEngine *engine, bool noteFilter)
-{
-    engine->noteFilter = noteFilter;
-}
-
-// TunerEngineSetNoteMask
-void TunerEngineSetNoteMask(TunerEngine *engine, uint32_t notes)
-{
-    engine->notes = notes;
-}
-
-// TunerEngineSetOctaveMask
-void TunerEngineSetOctaveMask(TunerEngine *engine, uint32_t octaves)
-{
-    engine->octaves = octaves;
+    engine->sequence++;
+    AnalysisRun(engine, &config, slot);
 }
 
 // TunerEngineProcessBlock
 TunerStatus TunerEngineProcessBlock(TunerEngine *engine, const float *block,
                                     TunerSlot *slot)
 {
-    if (engine == NULL || block == NULL || slot == NULL)
+    if (engine == NULL || block == NULL || slot == NULL || engine->running)
         return kTunerStatusBadArgument;
 
-    // Slide the window by one block, then filter the block in
-    // sample order onto its end
-    memmove(engine->buffer, engine->buffer + kTunerBlock,
-            (kTunerSamples - kTunerBlock) * sizeof(double));
-    FilterBlock(&engine->inputFilter, engine->filter, block, kTunerBlock,
-                engine->buffer + kTunerSamples - kTunerBlock);
-
-    AnalysisRun(engine, slot);
-    engine->sequence++;
-
+    EngineProcessHop(engine, block, slot);
     return kTunerStatusOK;
-}
-
-// TunerSlotCreate
-TunerSlot *TunerSlotCreate(void)
-{
-    return calloc(1, sizeof(TunerSlot));
-}
-
-// TunerSlotDestroy
-void TunerSlotDestroy(TunerSlot *slot)
-{
-    free(slot);
-}
-
-// TunerSlotView
-void TunerSlotView(const TunerSlot *slot, TunerSnapshot *snapshot)
-{
-    *snapshot = slot->values;
-    snapshot->maxima = slot->maxima;
-    snapshot->scope = slot->scope;
-    snapshot->spectrum = slot->spectrum;
 }
