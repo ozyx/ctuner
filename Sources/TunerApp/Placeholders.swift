@@ -15,10 +15,9 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  Placeholder panes that carry their clicks (R17), so every mirror of
-//  a toggle can be checked before the real panes arrive: U11 replaces
-//  the readout, meter and staff, U16 the strobe and U17 the scope and
-//  spectrum.
+//  The tuner's pane layout and the placeholder panes that carry their
+//  clicks (R17) until the real ones arrive: U16 replaces the strobe
+//  and U17 the scope and spectrum.
 
 import SwiftUI
 import TunerState
@@ -51,53 +50,46 @@ struct TunerPanes: View
         {
             // Today's tooltips: the readout and the meter lock the
             // display, the strobe and the staff replace each other
-            PlaceholderPane(help: "Display - click to lock",
-                            action: model.toggleLock)
-            {
-                ReadoutPlaceholder()
-            }
-            .frame(minHeight: 8 * 24)
+            ReadoutView()
+                .clickable(help: "Display - click to lock",
+                           action: model.toggleLock)
+                .frame(minHeight: 8 * 24)
 
-            PlaceholderPane(help: model.settings.strobe
-                              ? "Strobe - click for staff"
-                              : "Staff - click for strobe",
-                            action: model.toggleStrobe)
+            if model.settings.strobe
             {
-                Text(model.settings.strobe ? "Strobe" : "Staff")
-                    .foregroundStyle(.secondary)
+                PlaceholderPane(help: "Strobe - click for staff",
+                                action: model.toggleStrobe)
+                {
+                    Text("Strobe")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 80)
             }
-            .frame(minHeight: 80)
 
-            PlaceholderPane(help: "Meter - click to lock",
-                            action: model.toggleLock)
+            else
             {
-                Text("Meter")
-                    .foregroundStyle(.secondary)
+                StaffView()
+                    .clickable(help: "Staff - click for strobe",
+                               action: model.toggleStrobe)
+                    .frame(minHeight: 80)
             }
-            .frame(minHeight: 36, maxHeight: 48)
+
+            MeterView()
+                .clickable(help: "Meter - click to lock",
+                           action: model.toggleLock)
+                .frame(minHeight: 48, maxHeight: 72)
         }
         .padding(8)
     }
 }
 
-struct ReadoutPlaceholder: View
+extension View
 {
-    @Environment(AppModel.self) private var model
-
-    var body: some View
+    // clickable: a pane that carries its click and tooltip (R17)
+    func clickable(help: String, action: @escaping () -> Void) -> some View
     {
-        VStack(spacing: 4)
-        {
-            if model.display.isLocked
-            {
-                Label("Locked", systemImage: "lock.fill")
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(model.display.copyLine(transpose: model.settings.transpose)
-                   ?? "Readout")
-                .foregroundStyle(model.display.isStale ? .tertiary
-                                                       : .secondary)
-        }
+        return contentShape(.rect)
+            .onTapGesture(perform: action)
+            .help(help)
     }
 }
