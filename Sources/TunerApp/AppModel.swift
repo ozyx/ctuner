@@ -33,7 +33,7 @@ final class AppModel
     let display = DisplayModel()
 
     // Nil when the backend could not be made; captureFailure then says
-    // why, for the failed view U19 adds
+    // why, for the failed view
     private(set) var capture: CaptureController?
     private(set) var captureFailure: String?
 
@@ -121,6 +121,18 @@ final class AppModel
         }
 
         capture?.setVisible(visible)
+    }
+
+    // mainArea: the tuner, or the status view that replaces it
+    var mainArea: MainArea
+    {
+        return MainArea(state: capture?.state, failure: captureFailure)
+    }
+
+    // canCopy: the display holds a reading (R18)
+    var canCopy: Bool
+    {
+        return display.copyLine(transpose: settings.transpose) != nil
     }
 
     // toggleLock

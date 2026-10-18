@@ -41,7 +41,7 @@ struct PlaceholderPane<Content: View>: View
     }
 }
 
-struct MainArea: View
+struct TunerPanes: View
 {
     @Environment(AppModel.self) private var model
 
@@ -95,7 +95,7 @@ struct ReadoutPlaceholder: View
             }
 
             Text(model.display.copyLine(transpose: model.settings.transpose)
-                   ?? model.captureFailure ?? "Readout")
+                   ?? "Readout")
                 .foregroundStyle(model.display.isStale ? .tertiary
                                                        : .secondary)
         }

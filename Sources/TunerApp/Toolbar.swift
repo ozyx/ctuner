@@ -46,6 +46,7 @@ struct TunerToolbar: CustomizableToolbarContent
 {
     @Bindable var settings: TunerState.Settings
     @Bindable var display: DisplayModel
+    let lockEnabled: Bool
 
     var body: some CustomizableToolbarContent
     {
@@ -91,6 +92,7 @@ struct TunerToolbar: CustomizableToolbarContent
                           symbol: "lock",
                           help: "Lock display",
                           isOn: $display.isLocked)
+            .disabled(!lockEnabled)
         }
 
         ToolbarItem(id: "multiple")
