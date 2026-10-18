@@ -32,6 +32,9 @@ final class AppModel
     let settings = Settings()
     let display = DisplayModel()
 
+    // The scope and spectrum arrays, copied on the trace refresh
+    let traces = TraceStore()
+
     // Nil when the backend could not be made; captureFailure then says
     // why, for the failed view
     private(set) var capture: CaptureController?
@@ -46,8 +49,23 @@ final class AppModel
         do
         {
             let backend = try EngineBackend()
-            capture = CaptureController(backend: backend, model: display,
-                                        settings: settings)
+            let controller = CaptureController(backend: backend,
+                                               model: display,
+                                               settings: settings)
+
+            // The traces take a snapshot only on the refresh hop, and
+            // keep nothing of its buffers beyond this turn
+            let display = display
+            let traces = traces
+            controller.onSnapshot =
+            {
+                if display.traceRefresh
+                {
+                    traces.refresh($0)
+                }
+            }
+
+            capture = controller
         }
 
         catch

@@ -15,30 +15,10 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  The tuner's pane layout and the placeholder panes that carry their
-//  clicks (R17) until the real ones arrive: U17 replaces the scope and
-//  spectrum.
+//  The tuner's pane layout and the click every pane carries (R17).
 
 import SwiftUI
 import TunerState
-
-// A rounded pane holding a caption, clickable like the real pane
-struct PlaceholderPane<Content: View>: View
-{
-    let help: String
-    let action: () -> Void
-    @ViewBuilder let content: Content
-
-    var body: some View
-    {
-        content
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.quaternary, in: .rect(cornerRadius: 8))
-            .contentShape(.rect(cornerRadius: 8))
-            .onTapGesture(perform: action)
-            .help(help)
-    }
-}
 
 struct TunerPanes: View
 {
