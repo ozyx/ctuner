@@ -162,7 +162,7 @@ public enum SourceSpec: Equatable, Sendable
     }
 
     // parsePitch: Hz, or a note name with an optional cents offset
-    private static func parsePitch(_ text: String, description: String)
+    static func parsePitch(_ text: String, description: String)
       throws(SourceError) -> TonePitch
     {
         func fail(_ reason: String) -> SourceError
