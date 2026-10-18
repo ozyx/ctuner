@@ -16,8 +16,8 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //  The inspector (R10): the scope, the spectrum and the note filter,
-//  each a placeholder until U17 and U11 fill it. The scope and the
-//  spectrum carry their clicks.
+//  the scope and the spectrum placeholders until U17 fills them,
+//  carrying their clicks, and the note filter.
 
 import SwiftUI
 
@@ -43,11 +43,7 @@ struct InspectorView: View
                     .foregroundStyle(.secondary)
             }
 
-            PlaceholderPane(help: "Note filter", action: {})
-            {
-                Text("Note Filter")
-                    .foregroundStyle(.secondary)
-            }
+            NoteFilterView()
         }
         .padding(8)
     }
