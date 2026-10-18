@@ -238,6 +238,66 @@ struct SettingsTests
         #expect(settings.colour == 0)
     }
 
+    @Test func spectrumExpandAndColoursWrap()
+    {
+        let suite = Suite()
+        let settings = Settings(defaults: suite.defaults)
+
+        settings.expand = 1
+        var seen: [Int] = []
+        for _ in 0 ..< 6
+        {
+            settings.expandSpectrum()
+            seen.append(settings.expand)
+        }
+        #expect(seen == [2, 4, 8, 16, 1, 2])
+
+        settings.expand = 1
+        seen = []
+        for _ in 0 ..< 6
+        {
+            settings.contractSpectrum()
+            seen.append(settings.expand)
+        }
+        #expect(seen == [16, 8, 4, 2, 1, 16])
+
+        // A saved value that is not a power of two still lands in range
+        settings.expand = 3
+        settings.expandSpectrum()
+        #expect(settings.expand == 6)
+        settings.expand = 3
+        settings.contractSpectrum()
+        #expect(settings.expand == 1)
+
+        // An out of range value, set or saved, is clamped, so the cycle
+        // never sticks or traps
+        for (value, clamped, expanded, contracted) in
+              [(0, 1, 2, 16), (-4, 1, 2, 16), (32, 16, 1, 8),
+               (Int.max, 16, 1, 8)]
+        {
+            let saved = Suite()
+            saved.defaults.set(value, forKey: "expand")
+            #expect(Settings(defaults: saved.defaults).expand == clamped)
+
+            settings.expand = value
+            #expect(settings.expand == clamped)
+            settings.expandSpectrum()
+            #expect(settings.expand == expanded)
+            settings.expand = value
+            settings.contractSpectrum()
+            #expect(settings.expand == contracted)
+        }
+
+        settings.colour = 0
+        var colours: [Int] = []
+        for _ in 0 ..< 4
+        {
+            settings.cycleColour()
+            colours.append(settings.colour)
+        }
+        #expect(colours == [1, 2, 0, 1])
+    }
+
     @Test func referenceRange()
     {
         let suite = Suite()

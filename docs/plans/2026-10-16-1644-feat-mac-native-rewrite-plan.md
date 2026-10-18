@@ -233,6 +233,7 @@ flowchart TB
 - Replacing the temperament table while the engine runs. Nothing in R1 to R35 edits the table; the engine takes it at create and only the selected index changes at runtime. The deferred editable-temperaments feature can add a setter or recreate the engine when it is planned.
 - The hardened runtime and an entitlements file on the bundle. Today's linker-signed app with no entitlements captures audio, and notarization is out of scope; a missing or wrong entitlement would terminate the app on first capture. Notarization or the deferred sandbox work would change this.
 - All and None buttons for the note filter grid. With every note and octave on by default (R29), narrowing to one note takes about 19 clicks; if that proves tiresome in practice, two buttons per group make it three.
+- A Try Again button on the capture-failed view (U19). The controller already retries a failed start when the app becomes active or the input changes, and the view says so; failures that persist across those retries in practice would change this.
 
 ### Dependencies and Assumptions
 
@@ -275,6 +276,8 @@ This plan covers the Mac rewrite in its two stages. The surrounding breakdown is
 
 **Product Contract preservation:** changed: R3 (480 Hz corner, fixed hop, undefined behaviour made defined), R4 (transpose out, sample rate in, flag sets named), R5 (device following is new, no rate forcing), R6 (per-hop snapshot carries a found flag and the primary values), R7 (lock holds the whole display model; scope and spectrum traces keep moving), R8 (cadence inherits PR #2), R9 (transpose is display-only), R10 (zoom and expand live in the inspector), R11, R12 and R17 (broken behaviour named and fixed), R14 (full screen), R16 (inert menu items dropped), R18 (Command-C, idle copy), R19 (write on change, legacy keys migrate), R22 (per-frame rule applies to the strobe), AE7 (scoped to downsampling off). Added R29 to R35, F4, F5, AE9 to AE12, four Key Decisions and a Deferred to Follow-Up Work subsection; the Outstanding Questions deferred to planning are resolved into KTDs. The owner confirmed every change in the scoping synthesis on 2026-10-16. Document review then clarified R18 (the blank state is the only state that copies nothing) and R31 (blank, not "idle") without changing their meaning, and added three considered-and-not-built entries.
 
+On 2026-10-17 U10 was split into U10, U18 and U19 so each lands as its own pull request, and KTD16 was added; the Product Contract gained one considered-and-not-built entry (the failed view's Try Again button) and is otherwise unchanged.
+
 ### Key Technical Decisions
 
 - KTD1. **Minimum macOS 26, package tools-version 6.2.** (session-settled: user-directed — chosen over macOS 27: GitHub's `macos-latest` runner is macOS 26 with Xcode 26.6, so macOS 27-only APIs would not build in CI, and R26 needs CI to build the app.) Sets `platforms` in `Package.swift`, `LSMinimumSystemVersion`, and the compile-time and run-time guards in KTD8's capture shim.
@@ -292,6 +295,7 @@ This plan covers the Mac rewrite in its two stages. The surrounding breakdown is
 - KTD13. **The optimised baseline is measured before the refactor; the 5% target stands.** (session-settled: user-approved — chosen over trusting the 2026-10-16 profile: `swift/Makefile` builds with no optimisation flag for either compiler, and the profiled binary may have predated the draw fix in `c86f560`.) Recipe: build with optimisation on both compilers (`-O` for `swiftc`, `-O2` for the C compiler, as U1 sets), run the app from its bundle, `top` with a 3 second interval for 60 seconds in silence with the first sample discarded, and `sample` for the split. The numbers go in the stage 1 PR description.
 - KTD14. **Command Line Tools constraints are honoured, not worked around with Xcode.** `swift test` runs with `-Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing` when `xcode-select -p` resolves to the Command Line Tools, because the Testing macro plugin is otherwise found only about half the time there; the flag lives in one Makefile variable and is omitted on an Xcode toolchain such as CI's, where the flake does not occur and the path would name a different toolchain. The SwiftUI target uses `typealias LocalState<V> = SwiftUI.State<V>` for view-local state and an app-level `@Observable` model injected through the environment, because `@State` is a macro whose plugin the Command Line Tools lack. No XCTest, no `.metal` files, no asset catalog; the icon is an `.icns`.
 - KTD15. **Floating-point contraction is off in the core and the generator, set in source.** A `FP_CONTRACT OFF` pragma in the core's arithmetic files and in the generator makes the owner's clang and CI's clang produce the same results, keeps the library free of unsafe flags (KTD2), and keeps fixtures independent of which compiler built the generator. The reference engine was captured with contraction on, which is one reason the gate is 1e-12 rather than exact; measured drift between on and off is at most 5.8e-15 relative.
+- KTD16. **Until U12 the SwiftUI app is the `TunerApp` product, and the bundle script names and signs it `Tuner`.** The product name `Tuner` stays on `TunerAppKit` while `cd swift && make dmg` ships it, because the linker signs that binary with the product's name and the microphone grant is tied to that identifier (`docs/solutions/developer-experience/linker-signed-identifier-follows-product-name.md`). `make app` runs `Scripts/package-app.sh`, which copies the executable to the name in `App/Info.plist` and re-signs the bundle with `--identifier Tuner`, so the bundled SwiftUI app reads `Identifier=Tuner` whatever its product is called. U12 moves the `Tuner` product name to the SwiftUI target when it deletes `TunerAppKit`. From U10 on, CI also builds the `TunerApp` product, so a SwiftUI API that SDK 26 lacks fails the first PR, not U12 (the Goal Capsule's CI stop condition). Chosen over renaming the stage 1 product, which would change the identifier the shipped DMG carries, and over leaving CI to build only the stage 1 app until U12.
 
 ### High-Level Technical Design
 
@@ -402,6 +406,8 @@ flowchart TB
   U14[U14 App bundle script]
   U9[U9 AVAudioEngine capture]
   U10[U10 SwiftUI shell]
+  U18[U18 Capture in the SwiftUI app]
+  U19[U19 Permission and device states]
   U11[U11 Readout, meter, staff, note filter]
   U16[U16 Strobe layer]
   U17[U17 Scope and spectrum canvases]
@@ -419,15 +425,17 @@ flowchart TB
   U8 --> U14
   U8 --> U9
   U8 --> U10
-  U9 --> U10
   U14 --> U10
-  U9 --> U11
-  U10 --> U11
-  U10 --> U16
-  U10 --> U17
+  U9 --> U18
+  U10 --> U18
+  U18 --> U19
+  U18 --> U11
+  U18 --> U16
+  U18 --> U17
   U11 --> U12
   U16 --> U12
   U17 --> U12
+  U19 --> U12
   U12 --> U13
 ```
 
@@ -492,6 +500,8 @@ Today's redraw cadences are not deltas: the scope and spectrum refresh every six
 - Whether a many-peak fixture can reach a count of 8 under the auto-gain and the octave limit; U3 keeps it only if it is stable and clean under the address sanitizer.
 - The hardware buffer layout the sink block receives on a real device; the shim takes channel 0 of the first buffer and U9 confirms it is mono float32.
 - Whether CI's clang accepts the `nonblocking` attribute; the attribute-availability guard makes the answer harmless either way.
+- The URLs that open the Microphone pane of Privacy & Security and the Sound settings input pane on macOS 26 and 27; U19 checks each on both if it can, and on the owner's macOS 27 otherwise.
+- Whether the `Window` scene restores its frame across launches on its own; if not, U10 adds a frame autosave name.
 
 ### Risks and Mitigations
 
@@ -537,11 +547,13 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
 | U8 | Stage 1 integration: the AppKit app on the new core | `Package.swift`, `swift/`, `.github/workflows/build.yml`, `AGENTS.md` | U1, U5, U6, U7 |
 | U14 | App bundle: script, `App/` assets, root `make app` | `Scripts/package-app.sh`, `App/`, `Makefile` | U8 |
 | U9 | Stage 2 capture: AVAudioEngine, device following, permission | `Sources/TunerCapture/CaptureEngine.m`, `Sources/TunerState/CaptureController.swift` | U8 |
-| U10 | SwiftUI app shell | `Sources/TunerApp` | U8, U9, U14 |
-| U11 | Readout, meter, staff and note filter panes | `Sources/TunerApp/Panes` | U9, U10 |
-| U16 | Strobe layer | `Sources/TunerApp/Panes/StrobeLayerView.swift`, `Sources/TunerState/StrobeMotion.swift` | U10 |
-| U17 | Scope and spectrum canvases | `Sources/TunerApp/Panes/ScopeView.swift`, `SpectrumView.swift`, `Sources/TunerState/SpectrumAxis.swift` | U10 |
-| U12 | DMG, CI, removal of `swift/` and stage 1 capture, docs | `Makefile`, `.github/workflows/build.yml`, `AGENTS.md`, `README.md`, `App/README.md` | U11, U16, U17 |
+| U10 | SwiftUI app shell: window, toolbar, inspector, Settings, menus | `Package.swift`, `Sources/TunerApp`, `Makefile` | U8, U14 |
+| U18 | Capture in the SwiftUI app | `Sources/TunerApp/AppModel.swift`, `Sources/TunerApp/AppDelegate.swift` | U9, U10 |
+| U19 | Permission and device status views | `Sources/TunerApp/StatusViews.swift`, `Sources/TunerState/MainArea.swift` | U18 |
+| U11 | Readout, meter, staff and note filter panes | `Sources/TunerApp/Panes` | U18 |
+| U16 | Strobe layer | `Sources/TunerApp/Panes/StrobeLayerView.swift`, `Sources/TunerState/StrobeMotion.swift` | U18 |
+| U17 | Scope and spectrum canvases | `Sources/TunerApp/Panes/ScopeView.swift`, `SpectrumView.swift`, `Sources/TunerState/SpectrumAxis.swift` | U18 |
+| U12 | DMG, CI, removal of `swift/` and stage 1 capture, docs | `Makefile`, `.github/workflows/build.yml`, `AGENTS.md`, `README.md`, `App/README.md` | U11, U16, U17, U19 |
 | U13 | Performance and energy acceptance | `Makefile`, `Sources/TunerApp` | U12 |
 
 ### U1. Optimised baseline measurement
@@ -715,7 +727,7 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
   - Copy format for A4 +3.00 cents, 440.00 Hz target, 440.76 Hz measured equals today's exact line; copy returns that line in the stale and locked states; copy in blank returns nothing; in multiple-reed mode the primary line is copied.
   - Transposed note name and staff octave agree for every transpose value across C0 to B8.
   - Temperament table has 32 rows of 12, row 8 is equal temperament, rows 6 and 7 normalise to ratios.
-- **Verification:** `make test` green; `TunerState` imports no AppKit; the model's public surface is what U8 and U10 consume.
+- **Verification:** `make test` green; `TunerState` imports no AppKit; the model's public surface is what U8, U10 and U18 consume.
 
 ### U8. Stage 1 integration: the AppKit app on the new core
 
@@ -756,7 +768,7 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
 
 - **Goal:** Capture through AVAudioEngine and a sink node, following the default device and sample rate, with explicit permission handling and visibility-driven pausing, so R5, R25, R30, R31 and R34 hold.
 - **Requirements:** R5, R25, R30, R31, R34; F4, F5; AE9, AE10; KTD8.
-- **Dependencies:** U8. Its device and permission behaviour is checked by hand in U10, against the U10 bundle.
+- **Dependencies:** U8. Its device and permission behaviour is checked by hand in U18 and U19, against their bundles.
 - **Files:** `Sources/TunerCapture/include/TunerCapture.h`; `Sources/TunerCapture/CaptureEngine.m`; `Sources/TunerState/CaptureController.swift`; `Tests/TunerStateTests/CaptureControllerTests.swift`. `CaptureHAL.m` stays until U12 because the stage 1 app still ships.
 - **Approach:**
   1. The shim builds the sink node with the realtime-safe initializer when the SDK declares it and the system is macOS 27, and with the plain initializer otherwise, both selections made at compile time by SDK version and attribute availability and at run time by `@available`; the block takes channel 0 of the first buffer and calls the C push callback; no Swift closure is ever handed to the node.
@@ -769,34 +781,78 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
   - Covers AE10. A configuration change with no input stops capture and shows the no-device state; a later change with a 48000 Hz input recreates the core at 48000, clears the display to blank, and restarts.
   - Window hidden for less than the debounce keeps capture running; longer stops it; visible again restarts within one tick.
   - A restart after a device change resets the display to blank, not stale, and turns lock off.
-- **Verification:** the controller tests are green; the package builds against SDK 26 in CI; the hands-on device and permission checks pass as part of U10.
+- **Verification:** the controller tests are green; the package builds against SDK 26 in CI; the hands-on device and permission checks pass as part of U18 and U19.
 
-### U10. SwiftUI app shell
+### U10. SwiftUI app shell: window, toolbar, inspector, Settings, menus
 
-- **Goal:** The Mac-shaped window: scenes, toolbar, inspector, Settings, menus with shortcuts, lifecycle and the permission and device states, hosting placeholder panes until U11, U16 and U17.
-- **Requirements:** R9, R10, R11, R13, R14, R15, R16, R17, R19, R29, R30, R31, R32, R33, R34; F4, F5; AE6, AE9, AE10; KTD1, KTD9, KTD11, KTD14.
-- **Dependencies:** U8, U9, U14.
-- **Files:** `Package.swift` (`TunerApp` executable target with main-actor default isolation); `Sources/TunerApp/TunerApp.swift`; `Sources/TunerApp/AppDelegate.swift`; `Sources/TunerApp/RootView.swift`; `Sources/TunerApp/Toolbar.swift`; `Sources/TunerApp/InspectorView.swift`; `Sources/TunerApp/SettingsView.swift`; `Sources/TunerApp/Commands.swift`; `Sources/TunerApp/StatusViews.swift`; `Sources/TunerApp/LocalState.swift`; `Makefile` (`app` bundles `TunerApp` from here on).
+- **Goal:** A bundled SwiftUI Tuner opens the Mac-shaped window on the settings and display models, with placeholder panes and no capture, so the owner can review the window on its own.
+- **Requirements:** R10, R14, R15, R16, R17, R19, R32, R33, R34 (quit on close); AE6; KTD1, KTD11, KTD14, KTD16.
+- **Dependencies:** U8, U14. Ships as its own PR.
+- **Files:** `Package.swift` (`TunerApp` executable target and product, Swift 6 mode, main-actor default isolation, depending on `TunerState`); `Sources/TunerApp/TunerApp.swift`; `Sources/TunerApp/AppDelegate.swift`; `Sources/TunerApp/AppModel.swift`; `Sources/TunerApp/RootView.swift`; `Sources/TunerApp/Placeholders.swift`; `Sources/TunerApp/Toolbar.swift`; `Sources/TunerApp/InspectorView.swift`; `Sources/TunerApp/SettingsView.swift`; `Sources/TunerApp/Commands.swift`; `Sources/TunerApp/LocalState.swift`; `Makefile` (`APPPRODUCT` becomes `TunerApp`); `.github/workflows/build.yml` (a step that builds the `TunerApp` product); `AGENTS.md` (`make app` now bundles the SwiftUI app; `cd swift && make dmg` still ships stage 1).
 - **Approach:**
-  1. App with one window scene, a default size, content-minimum resizability, the unified toolbar style, full screen allowed, and a Settings scene as a tab view (General: reference field with stepper and the 300 to 500 range, transpose, temperament, key; Strobe: colour scheme). The minimum content size fits the toolbar items in one row and, in the main area, eight multiple-reed rows, the meter and a minimum-height strobe (R11); extra height goes to the strobe or staff; the readout text scales to the width it has. Do not replace the app-settings command group.
-  2. Delegate adaptor for quit on last window close and for the occlusion and hide observers that set the model's paused flag.
-  3. Toolbar: filter, lock, multiple reeds, strobe or staff, downsample, fundamental filter, note filter and inspector toggles, each a symbol with a text label and a tinted on-state so the compact window shows which analysis toggles are active (R17); the four analysis toggles (filter, downsample, fundamental, note filter) never move into the overflow menu, the others may; today's tooltips become the toolbar help text.
-  4. Inspector with the scope, the spectrum with zoom and expand controls in its header, and the note filter grid; visibility bound to the settings model. The toolbar toggle enables the note filter and the inspector grid picks notes and octaves; the grid's header mirrors the toggle so F3 can be done from either place.
-  5. Commands: the View menu holds the pane toggles and the inspector command with Command-Option-I (R10, R15); a Tuner menu holds copy readout, lock, the colour cycle and expand, all with the bare-letter shortcuts (KTD11); Edit > Copy maps to copy readout; no Print, Find, Spelling or Help items.
-  6. Denied and no-device status views replace the main area only, leaving the toolbar and inspector in place with lock and copy disabled while nothing is held; the denied view carries the Privacy pane button (R30) and the no-device view a button that opens the Sound settings input pane, the action F4 names.
-  7. The app-level observable model injected through the environment; `LocalState` alias for view-local flags.
-- **Patterns to follow:** the SwiftUI surface sketch verified on this toolchain; HIG Settings and Toolbars; the pop-up labels for expand, colours, transpose and keys and the tooltips in `swift/AppDelegate.swift`.
+  1. One `Window` scene with a default size, content-minimum resizability, the unified toolbar style and full screen allowed, plus a `Settings` scene as a tab view (General: reference field with stepper and the R33 range, transpose, temperament, key; Strobe: colour scheme). Do not replace the app-settings command group.
+  2. The minimum content size fits the toolbar items in one row and, in the main area, eight multiple-reed rows, the meter and a minimum-height strobe (R11), sized from today's row height in `swift/DisplayView.swift`; U11 confirms it against the real rows.
+  3. `AppModel` is the app-level `@Observable` model, injected through the environment, owning `Settings` and `DisplayModel`; view-local flags use the `LocalState` alias (KTD14).
+  4. The delegate adaptor quits when the last window closes (R34's first clause); visibility observers arrive in U18.
+  5. Toolbar per R17: filter, lock, multiple reeds, strobe or staff, downsample, fundamental filter, note filter and inspector toggles, each a symbol with a text label and a tinted on-state; the four analysis toggles never move into overflow; today's tooltips from `swift/AppDelegate.swift` become the help text.
+  6. Inspector: scope, spectrum and note filter sections, each a placeholder until U17 and U11 fill it; visibility bound to `settings.inspector`.
+  7. Commands per KTD11: the View menu with the pane toggles and the inspector on Command-Option-I; a Tuner menu with copy readout, lock, the colour cycle, zoom and expand and contract; Edit > Copy maps to copy readout; no Print, Find, Spelling or Help items.
+  8. Placeholder panes for the readout, the strobe or staff and the meter carry their R17 clicks (readout and meter toggle lock, strobe and staff toggle `settings.strobe`), so every mirror can be checked now; U11, U16 and U17 replace them.
+  9. `make app` bundles the `TunerApp` product per KTD16; CI builds it on SDK 26.
+- **Execution note:** this is mostly scenes, commands and bindings over models U7 already tests; the first proof is the bundle building in CI and launching, then the manual list.
+- **Patterns to follow:** the SwiftUI surface sketch verified on this toolchain; HIG Settings and Toolbars; the pop-up labels for expand, colours, transpose and keys and the tooltips in `swift/AppDelegate.swift`; `docs/solutions/developer-experience/command-line-tools-swift-gaps.md` (no `@State`, no `@Entry`).
 - **Test scenarios:**
-  - Covers AE6. Quit with the inspector hidden, relaunch: compact window; press the inspector button: scope, spectrum and note filter appear.
-  - Manual: every toolbar action has a menu item with its shortcut; each bare key works with the main window focused and types into the reference field when it has focus; Command-comma opens Settings; the reference field rejects 0 and 1000 and commits 415 on Enter; closing the window quits; the window frame is restored on relaunch; full screen works; first launch shows the strobe and no inspector; the window cannot shrink below the size that shows eight reed rows; the analysis toggles stay visible and show their state at the minimum width.
-  - Covers AE9 and AE10, by hand on the owner's Mac with this unit's bundle: unplug and replug a USB interface; switch the default input in System Settings; revoke the microphone in Privacy & Security and come back; the no-device button opens Sound settings; hide the window and watch the microphone indicator go off after the debounce; a Bluetooth headset as default input does not change its profile when the app starts.
-- **Verification:** the app launches from the U14 bundle; the owner reviews the window against Apple's apps; both manual lists pass.
+  - `make build` builds `TunerApp` on the Command Line Tools, and the CI job builds it on SDK 26.
+  - `codesign -dv .build/Tuner.app` reads `Identifier=Tuner` after `make app`.
+  - Covers AE6. Quit with the inspector hidden, relaunch: compact window; press the inspector button: the three inspector sections appear.
+  - Manual: every toolbar action has a menu item with its shortcut; each bare key works with the main window focused and types into the reference field when it has focus; Command-comma opens Settings; the reference field rejects 0 and 1000 and commits 415 on Enter; Settings changes persist across a relaunch; closing the window quits; the window frame is restored on relaunch; full screen works; first launch shows the strobe placeholder and no inspector; the analysis toggles stay visible and show their state at the minimum width; clicking each placeholder flips its toggle and the toolbar and menu mirrors follow.
+- **Verification:** the app launches from the `make app` bundle; the owner reviews the window against Apple's apps; the manual list passes; CI is green with the `TunerApp` build step.
+
+### U18. Capture in the SwiftUI app
+
+- **Goal:** The SwiftUI window captures from the default input through U9's controller, follows device changes and pauses when not visible, with a plain-text reading so capture can be checked before U11.
+- **Requirements:** R5, R8, R30, R31, R34; F4; KTD8, KTD9, KTD10.
+- **Dependencies:** U9, U10. Ships as its own PR. The headless plan's U8 (`docs/plans/2026-10-17-1536-feat-headless-audio-input-plan.md`) can start once this unit merges, because it chooses the backend this unit creates; its construction error shows in U19's failed view.
+- **Files:** `Sources/TunerApp/AppModel.swift`; `Sources/TunerApp/AppDelegate.swift`; `Sources/TunerApp/Placeholders.swift`; `Package.swift` (`TunerApp` gains `TunerCapture`).
+- **Approach:**
+  1. `AppModel` creates the `EngineBackend` and the `CaptureController` with its settings and display model at launch; if the backend cannot be created, it keeps the error message as the capture failure U19 shows.
+  2. The delegate adaptor calls `activate()` when the app becomes active, which is also the first start and the permission request (R30).
+  3. The main window's occlusion state and app hide combine into one visibility Boolean on `AppModel` that drives `setVisible(_:)` (KTD9); U16 pauses the strobe on the same Boolean.
+  4. The readout placeholder shows the display model's note, cents and frequency as plain text, greyed when stale; U11 replaces it.
+  5. `onSnapshot` stays unset here; U17 sets it for the scope and spectrum.
+- **Patterns to follow:** `Tests/TunerStateTests/CaptureControllerTests.swift` for the lifecycle the window drives; `swift/AppDelegate.swift` `startAudio` and shutdown order; `docs/solutions/developer-experience/realtime-sink-initializer-objc-only.md` (no audio-thread block formed in Swift).
+- **Test scenarios:**
+  - The controller's states and transitions are U9's tests; this unit adds no state logic.
+  - Manual: on a fresh grant the first launch asks for the microphone once, then a played A4 shows in the placeholder reading.
+  - Manual: hide the window and watch the microphone indicator go off after the 3 s debounce; show it and the reading returns within a tick.
+  - Manual, owner-only: switch the default input in System Settings and the reading blanks, then resumes at the new device's rate; a Bluetooth headset as default input keeps its profile when the app starts.
+- **Verification:** the bundle captures and the placeholder follows a played note; `sample` while a note plays shows no analysis function on the main thread; the manual checks pass.
+
+### U19. Permission and device status views
+
+- **Goal:** The denied, no-device and failed capture states replace the main area with what happened and what fixes it, and copy is disabled while nothing is held.
+- **Requirements:** R18, R30, R31; F4, F5; AE9, AE10.
+- **Dependencies:** U18. Ships as its own PR.
+- **Files:** `Sources/TunerState/MainArea.swift`; `Tests/TunerStateTests/MainAreaTests.swift`; `Sources/TunerApp/StatusViews.swift`; `Sources/TunerApp/RootView.swift`; `Sources/TunerApp/Commands.swift`; `Sources/TunerApp/Toolbar.swift`.
+- **Approach:**
+  1. `MainArea` in `TunerState` maps the capture state and a backend-creation failure to what the main area shows: the tuner for stopped, requesting and running; the denied view; the no-device view; the failed view with its message. Requesting shows the tuner, blank, because the system prompt is up.
+  2. The denied view carries a button that opens the Microphone pane of Privacy & Security (R30); the no-device view a button that opens the Sound settings input pane (F4); the failed view the message and that Tuner retries when it becomes active or the input changes, which the controller already does.
+  3. The status views replace the main area only; the toolbar and inspector stay.
+  4. Copy readout, in the toolbar and the menus, is disabled while the display model holds no reading (R18); lock is disabled only while a status view replaces the main area, because lock in the blank tuner is a valid state (KTD10).
+- **Patterns to follow:** U9's `CaptureState` cases; the capture lifecycle diagram in this plan.
+- **Test scenarios:**
+  - Stopped, requesting and running map to the tuner; denied to the denied view; no device to the no-device view.
+  - A failed state carries its message through to the failed view; a backend-creation failure maps to the failed view with its message.
+  - Covers AE9, by hand on the owner's Mac with this unit's bundle: revoke the microphone in Privacy & Security and relaunch; the denied view shows and its button opens the Microphone pane; grant access, return to Tuner, and a played note shows.
+  - Covers AE10, by hand on the owner's Mac: unplug a USB interface while tuning and the no-device view shows within a second; its button opens Sound settings; with the built-in microphone as default input, capture restarts and the next note shows.
+  - Manual: copy is disabled before the first reading and enabled once one shows; lock stays enabled in the blank tuner and is disabled while a status view shows.
+- **Verification:** `make test` green with the mapping tests; the owner runs AE9 and AE10 and the device checks on this unit's bundle.
 
 ### U11. Readout, meter, staff and note filter panes
 
 - **Goal:** The readout and meter per PR #2's design, the staff with the ported glyphs, and the note filter, driven by the display model and following the system appearance.
 - **Requirements:** R7, R8, R9, R11, R13, R14, R17, R35; AE4, AE12; KTD9, KTD10.
-- **Dependencies:** U9, U10.
+- **Dependencies:** U18.
 - **Files:** `Sources/TunerApp/Panes/ReadoutView.swift`; `Sources/TunerApp/Panes/MeterView.swift`; `Sources/TunerApp/Panes/StaffView.swift`; `Sources/TunerApp/Panes/NoteFilterView.swift`; `Sources/TunerState/DisplayModel.swift` (signposts from hop publish to readout update for the latency measurement).
 - **Approach:**
   1. Readout: single mode with the note dominant, measured Hz as the large number sized for the widest value, target and difference below, the A4 reference last; multiple-reed mode with one row per maximum and all rows visible; blank before the first reading; greyed when stale; an "L" badge when locked; click toggles lock.
@@ -816,7 +872,7 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
 
 - **Goal:** The strobe as a Core Animation layer whose motion is time-based, calibrated to today's feel and continuous across speed changes, with no app code per frame.
 - **Requirements:** R13, R22, R35; KTD9.
-- **Dependencies:** U10.
+- **Dependencies:** U18, for live cents and the visibility Boolean.
 - **Files:** `Sources/TunerApp/Panes/StrobeLayerView.swift`; `Sources/TunerState/StrobeMotion.swift`; `Tests/TunerStateTests/StrobeMotionTests.swift`.
 - **Approach:**
   1. Layer-backed representable hosting four band layers with period doubling, colour schemes from today's three foreground and background pairs, fixed in both appearances, and the three looks (plain, gradient above 20 cents, flat fill above 40 cents) switched when the state machine's cents cross those thresholds.
@@ -836,7 +892,7 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
 
 - **Goal:** The scope and spectrum as canvases redrawn on the trace refresh cadence with correct axes and markers in both modes.
 - **Requirements:** R10, R12, R16, R17; KTD5, KTD9, KTD10.
-- **Dependencies:** U10.
+- **Dependencies:** U18, which leaves `onSnapshot` for this unit to set.
 - **Files:** `Sources/TunerApp/Panes/ScopeView.swift`; `Sources/TunerApp/Panes/SpectrumView.swift`; `Sources/TunerState/SpectrumAxis.swift`; `Tests/TunerStateTests/SpectrumAxisTests.swift`.
 - **Approach:**
   1. Scope: trigger on the steepest rising slope among the first width samples, trace at four samples per point from the snapshot's 8192-sample window, clamped so the trace never reads beyond that window at any pane width, graticule, the filter and fundamental badges; redrawn on the display model's trace refresh flag (today's every sixteenth hop) from a path cached until the next refresh; click toggles the filter.
@@ -855,16 +911,16 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
 
 - **Goal:** CI builds and uploads the stage 2 app and DMG from the new layout; the old app directory and the stage 1 capture backend are gone; the docs describe the new app; the DMG CI ships has been run on the owner's Mac.
 - **Requirements:** R23, R26, R27, R28; AE8, AE10; KTD2, KTD8, KTD12.
-- **Dependencies:** U11, U16, U17.
+- **Dependencies:** U11, U16, U17, U19.
 - **Files:** `Makefile` (`dmg`); `.github/workflows/build.yml`; delete `swift/` entirely, including `swift/Tuner.entitlements`; delete `Sources/TunerCapture/CaptureHAL.m`; `Package.swift` (remove `TunerAppKit`); `App/README.md`; `AGENTS.md`; `README.md`; `.gitignore` (drop the `swift/Tuner` and `swift/Tuner.icns` entries).
 - **Approach:**
   1. `make dmg` from `hdiutil` as today, containing the app and `App/README.md`, named from the version in `App/Info.plist`, which becomes the version's home once `swift/Info.plist` is gone.
   2. CI: `make test` and `make dmg` at the root; upload paths for the new app and DMG locations; Linux job unchanged.
   3. Delete `swift/`, the `TunerAppKit` target and the AUHAL backend; move the shipped README to `App/README.md` with the corrected key table and the new toolbar and menu commands; rewrite `AGENTS.md` for the package layout, build, test, fixture regeneration and the `swift test` flag; update the root README.
-  4. Download the DMG CI built for the final stage 2 PR, install it on the owner's Mac, and run U10's device and permission checks and AE10 against it, so the plain-initializer capture path compiled against SDK 26 is exercised on macOS 27 before stage 2 is called done.
+  4. Download the DMG CI built for the final stage 2 PR, install it on the owner's Mac, and run U18's device checks and U19's AE9 and AE10 checks against it, so the plain-initializer capture path compiled against SDK 26 is exercised on macOS 27 before stage 2 is called done.
 - **Patterns to follow:** `swift/Makefile`'s DMG rule; the `docs/solutions/` frontmatter for any learning captured on the way.
 - **Test expectation:** none -- packaging and documentation; smoke verification below.
-- **Verification:** Covers AE8: a fresh clone on a Mac with the Command Line Tools runs the documented command and produces `Tuner.app` and the DMG; the app launches and asks for the microphone once; CI green with both artifacts uploaded; the CI-built DMG passes U10's device and permission checks and AE10 on the owner's Mac; no AUHAL symbol in the package; `grep` finds no reference to `swift/` in docs or workflows.
+- **Verification:** Covers AE8: a fresh clone on a Mac with the Command Line Tools runs the documented command and produces `Tuner.app` and the DMG; the app launches and asks for the microphone once; CI green with both artifacts uploaded; the CI-built DMG passes U18's device checks and U19's AE9 and AE10 checks on the owner's Mac; no AUHAL symbol in the package; `grep` finds no reference to `swift/` in docs or workflows.
 
 ### U13. Performance and energy acceptance
 
@@ -897,14 +953,14 @@ Conventions for every unit: derived files keep Bill Farmer's GPL header block; n
 | Stage 1 app | `cd swift && make` (package release build plus bundle) | the AppKit app builds on the new core with no warnings | U1, U8 |
 | Stage 2 app and DMG | `make app` and `make dmg` at the repo root | R23, AE8 | U14, U12 |
 | CI | `.github/workflows/build.yml` on every pull request: `make test`, then the stage's app build and uploads, on `macos-latest` with Xcode's toolchain and SDK 26 | R26, KTD8's compile-time guards | U8, U9, U12 |
-| CI-built DMG on the owner's Mac | install the DMG CI built and run U10's device and permission checks and AE10 against it | KTD8's SDK 26 capture path on macOS 27 | U12 |
+| CI-built DMG on the owner's Mac | install the DMG CI built and run U18's device checks and U19's AE9 and AE10 checks against it | KTD8's SDK 26 capture path on macOS 27 | U12 |
 | Main-thread audit | `sample <pid> 5` while a note plays; no analysis function on the main thread | R2, AE2 | U8, U13 |
 | Idle CPU | `top -l 21 -s 3 -pid <pid>` in silence, inspector hidden, first sample discarded; mean under 5% in stage 2, not above U1's baseline in stage 1 | R21, AE3 | U1 (baseline), U8, U13 |
 | Per-frame allocations | `MallocStackLoggingNoCompact=1`, two `malloc_history -allEvents` counts divided by elapsed seconds and frame rate; strobe path adds none | R22 | U16, U13 |
 | Latency | `log stream --signpost` on the app's subsystem using U11's signposts; hop publish to readout update under one hop plus one frame | Success Criteria | U13 |
 | Pause | window hidden: CPU at the idle floor, idle wake-ups under one per second, microphone indicator off after the debounce | R34 | U9, U13 |
 | Bundle | `codesign --verify --strict` on the bundle; no entitlements embedded; the usage description equals today's string | R27, KTD12 | U14, U12 |
-| Manual checklist | the per-unit manual lists in U8, U10, U11, U16 and U17, run on the owner's Mac from the bundled app | the behaviour tests cannot reach: devices, permission, feel, look, appearance | U8 to U17 |
+| Manual checklist | the per-unit manual lists in U8, U10, U18, U19, U11, U16 and U17, run on the owner's Mac from the bundled app | the behaviour tests cannot reach: devices, permission, feel, look, appearance | U8 to U17 |
 
 Tests never open an audio device; everything that needs hardware is on the manual checklist. The plugin path lives in one Makefile variable and nowhere else.
 
@@ -938,7 +994,9 @@ Tests never open an audio device; everything that needs hardware is on the manua
 | U8 | `TunerAppKit` builds through the package; clean `make` in `swift/`; AE2 observed; today's redraw cadences kept; idle CPU not above U1's baseline; manual checklist passed with only the accepted deltas; stage 1 PR merged |
 | U14 | Bundle launches, verifies, embeds no entitlements and carries today's usage description |
 | U9 | Controller tests green; package builds on CI's SDK 26 |
-| U10 | AE6 passes; menu, shortcut, Settings, lifecycle, first-launch, minimum-size and toolbar checks pass; the device and permission checks pass with this unit's bundle; owner accepts the window |
+| U10 | AE6 passes; menu, shortcut, Settings, lifecycle, first-launch, minimum-size and toolbar checks pass; CI builds `TunerApp`; the bundle reads `Identifier=Tuner`; owner accepts the window |
+| U18 | The bundle captures and follows a played note; the pause and device checks pass on the owner's Mac; no analysis on the main thread |
+| U19 | Mapping tests green; AE9 and AE10 pass by hand on the owner's Mac with this unit's bundle |
 | U11 | Readout, meter, staff and note filter pass their manual checks in both appearances; AE4 and AE12 observed; signposts present |
 | U16 | Motion and continuity tests green; R22 allocation check passes; owner accepts the feel |
 | U17 | Axis, decimation and clamp tests green; markers on the trace in both modes; traces refresh at the model's cadence and move under lock |

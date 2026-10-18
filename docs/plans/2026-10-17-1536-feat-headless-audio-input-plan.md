@@ -15,7 +15,7 @@ execution: code
 - **Objective:** The owner can check that the tuner reads a known tone correctly, and can watch the app respond to canned sound, without speakers, the microphone, a quiet room or giving up the laptop. CI catches a reading that drifts.
 - **Means:** One shared file-or-tone sound source with two front ends: a `tuner-run` command that prints readings and can pass or fail against a target, and a launch-time input source for the app that plugs into stage 2's capture controller as a backend (KTD1, KTD8).
 - **Product authority:** The owner, who is the app's only user (STRATEGY.md). The Product Contract below wins on behaviour; the Planning Contract wins on mechanism.
-- **Execution profile:** Two pull requests. PR A (U1 to U6) ships `tuner-run`, its library and the CI checks from `master`, together with this plan and `docs/ideation/2026-10-17-headless-audio-input-ideation.html`. PR B (U7, U8) stacks on stage 2: U7 needs the `CaptureBackend` protocol from `feat/stage2-bundle-capture`, and U8 needs the SwiftUI app shell from the rewrite plan's U10.
+- **Execution profile:** Two pull requests. PR A (U1 to U6) ships `tuner-run`, its library and the CI checks from `master`, together with this plan and `docs/ideation/2026-10-17-headless-audio-input-ideation.html`. PR B (U7, U8) stacks on stage 2: U7 needs the `CaptureBackend` protocol from `feat/stage2-bundle-capture`, and U8 needs the SwiftUI app's capture setup from the rewrite plan's U18.
 - **Stop conditions:** Stop and ask the owner if the Kirnberger III check in U6 fails against the app's own temperament table (see Risks), if stage 2 changes or drops `CaptureBackend` before PR B starts, or before launching Tuner.app on the owner's Mac.
 - **Finishes and ships:** Each PR comes from a feature branch in a worktree, per AGENTS.md. PR B's branch is based on stage 2's branch, not on `master`, until stage 2 merges.
 - **Open blockers:** None for PR A. PR B waits on stage 2 (see Dependencies).
@@ -183,7 +183,7 @@ flowchart TB
     FD --> ENG
   end
   subgraph PRB[PR B, on stage 2]
-    APP[SwiftUI app shell, rewrite U10] --> IS[TunerSource: InputSource from launch arguments]
+    APP[SwiftUI app capture setup, rewrite U18] --> IS[TunerSource: InputSource from launch arguments]
     APP --> CC[TunerState CaptureController]
     CC --> SB[TunerSource: SourceBackend]
     CC --> EB[EngineBackend, the microphone]
@@ -212,7 +212,7 @@ flowchart TB
 
 ### Sequencing
 
-PR A (U1 to U6) lands on `master` first. Stage 2 then rebases onto `master`; that is the stage 2 owner's work, not this plan's. PR B starts from the rebased stage 2 branch: U7 can be built and tested as soon as `CaptureBackend` and `TunerSource` are on the same branch, but it ships in PR B together with U8, which merges after the rewrite plan's U10 exists.
+PR A (U1 to U6) lands on `master` first. Stage 2 then rebases onto `master`; that is the stage 2 owner's work, not this plan's. PR B starts from the rebased stage 2 branch: U7 can be built and tested as soon as `CaptureBackend` and `TunerSource` are on the same branch, but it ships in PR B together with U8, which merges after the rewrite plan's U18 exists.
 
 ---
 
@@ -365,11 +365,11 @@ PR A (U1 to U6) lands on `master` first. Stage 2 then rebases onto `master`; tha
 
 - **Goal:** The owner launches the stage 2 app with `-InputSource file:<path>` or `-InputSource tone:<spec>` and watches it respond, and the next plain launch uses the mic.
 - **Requirements:** R10, R11, R12, R4; KTD11.
-- **Dependencies:** U7, and the rewrite plan's U10 (the SwiftUI app shell that owns `CaptureController`).
-- **Files:** `Sources/TunerSource/InputSource.swift`, `Tests/TunerSourceTests/InputSourceTests.swift`, the U10 app's capture setup under `Sources/TunerApp/` (path set by U10), and the stage 2 app's README.
+- **Dependencies:** U7, and the rewrite plan's U18 (the SwiftUI app's capture setup that owns `CaptureController`).
+- **Files:** `Sources/TunerSource/InputSource.swift`, `Tests/TunerSourceTests/InputSourceTests.swift`, the app's capture setup in `Sources/TunerApp/AppModel.swift` (set by the rewrite plan's U18), and the stage 2 app's README.
 - **Approach:**
   1. A function in `TunerSource` takes the argument-domain dictionary and returns no source, a source description, or an error for an empty value or unknown scheme. The app passes `UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)`; tests pass literal dictionaries.
-  2. The app's capture setup picks `SourceBackend` when a source is given, built with the app `Settings`' reference, temperament and key, and `EngineBackend` otherwise; a construction error goes to the same failure display U10 uses when `EngineBackend` fails to construct.
+  2. The app's capture setup picks `SourceBackend` when a source is given, built with the app `Settings`' reference, temperament and key, and `EngineBackend` otherwise; a construction error goes to the same capture failure `AppModel` keeps when `EngineBackend` fails to construct (rewrite U18), which the rewrite plan's U19 shows.
   3. Document the flag; that `file:` paths must be absolute, because an app started by `open` runs with `/` as its working directory; and that `open -n` or quitting first is needed because `open --args` passes nothing to a running instance.
 - **Patterns to follow:** `SettingsTests` for an injected `UserDefaults(suiteName:)` with `removePersistentDomain`.
 - **Test scenarios:**
@@ -400,7 +400,7 @@ No test or check opens an audio device or plays sound.
 ## Definition of Done
 
 - PR A is merged: `make test` and `make tone-checks` pass locally and in CI, `make test-release` passes locally, and the PR includes this plan and the ideation page.
-- PR B is merged after stage 2's capture controller and U10's app shell: `make test` passes on that branch, and the owner has run AE4 and AE6.
+- PR B is merged after stage 2's capture controller and the rewrite plan's U18: `make test` passes on that branch, and the owner has run AE4 and AE6.
 - Every unit's test scenarios exist and pass; each AE is covered by a test or by the owner's check.
 - `AGENTS.md` lists `make tone-checks`, and the stage 2 app's README documents `-InputSource`.
 - The `Tuner` product name is unchanged, and no target uses `unsafeFlags`.
@@ -424,4 +424,4 @@ No test or check opens an audio device or plays sound.
 - **The app's Kirnberger III row may not match the published ratios.** The tables come from Bill Farmer's `Temperaments.h`. If AE7 fails against the app's table, that is a finding about the table, not about the check: stop and ask the owner before changing either.
 - **Stage 2 is in flight in another session.** Its controller API may change before PR B starts, and its rebase onto `master` after PR A may conflict in `Package.swift` and `Engine.swift`. PR A keeps its `Engine` change additive to keep that rebase small.
 - **Accelerate can differ in the last bits across machines.** The ±0.5 cent tolerance absorbs it; fast mode is deterministic only on one machine, so no check compares exact cents across machines.
-- **The visual check waits on the rewrite plan's U10.** Until it exists, F2 cannot be run; `tuner-run` covers the accuracy half meanwhile.
+- **The visual check waits on the rewrite plan's U18.** Until it exists, F2 cannot be run; `tuner-run` covers the accuracy half meanwhile.
