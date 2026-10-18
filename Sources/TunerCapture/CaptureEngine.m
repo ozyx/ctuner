@@ -28,6 +28,34 @@
 
 #include "TunerCapture.h"
 
+// CaptureStatusString
+const char *CaptureStatusString(CaptureStatus status)
+{
+    switch (status)
+    {
+    case kCaptureStatusOK:
+        return "OK";
+    case kCaptureStatusNoMemory:
+        return "Out of memory";
+    case kCaptureStatusBadArgument:
+        return "Bad argument";
+    case kCaptureStatusNoComponent:
+        return "No audio output unit";
+    case kCaptureStatusNoInputDevice:
+        return "No input device";
+    case kCaptureStatusDevice:
+        return "Input device setup failed";
+    case kCaptureStatusUnit:
+        return "Audio unit setup failed";
+    case kCaptureStatusStart:
+        return "Audio input failed to start";
+    case kCaptureStatusRender:
+        return "Audio input failed";
+    }
+
+    return "Unknown status";
+}
+
 // Check what the sink block calls, where this clang can
 #if defined(__has_warning)
 #if __has_warning("-Wfunction-effects")

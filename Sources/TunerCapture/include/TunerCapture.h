@@ -38,13 +38,6 @@ extern "C" {
 #define CAPTURE_NONBLOCKING
 #endif
 
-// Sizes
-enum
-{
-    kCaptureBlock = 1024,
-    kCaptureSampleRate = 44100
-};
-
 // Capture status codes
 typedef enum
 {
@@ -59,8 +52,6 @@ typedef enum
     kCaptureStatusRender
 } CaptureStatus;
 
-typedef struct Capture Capture;
-
 // Called on the audio thread with each block of samples
 typedef void (*CapturePush)(void *context, const float *samples,
                             int count) CAPTURE_NONBLOCKING;
@@ -68,33 +59,10 @@ typedef void (*CapturePush)(void *context, const float *samples,
 // Status string
 const char *CaptureStatusString(CaptureStatus status);
 
-// The buffer size to ask a device for, given its buffer size range:
-// the block, halved until the device takes it, and never below the
-// device's minimum
-int CaptureBufferFrames(double minimum, double maximum);
-
-// Create capture on the default input device, asking the device for
-// kCaptureSampleRate and taking the rate it gives. Destroy stops
-// capture if it is running and disposes the unit.
-CaptureStatus CaptureCreate(CapturePush push, void *context,
-                            Capture **capture);
-void CaptureDestroy(Capture *capture);
-
-// Start and stop the input callback
-CaptureStatus CaptureStart(Capture *capture);
-void CaptureStop(Capture *capture);
-
-// The latest status, which the input callback sets when a render
-// fails; safe to read from any thread
-CaptureStatus CaptureGetStatus(Capture *capture);
-
-// The device's sample rate, read at create
-double CaptureSampleRate(Capture *capture);
-
-// Stage 2 capture: AVAudioEngine and a sink node on the default input
-// at the device's own rate, which is never changed. The engine lives
-// as long as the handle; each start attaches a new sink and each stop
-// detaches it. The blocks are formed here, never in Swift.
+// AVAudioEngine and a sink node on the default input at the device's
+// own rate, which is never changed. The engine lives as long as the
+// handle; each start attaches a new sink and each stop detaches it. The
+// blocks are formed here, never in Swift.
 
 typedef struct CaptureEngine CaptureEngine;
 

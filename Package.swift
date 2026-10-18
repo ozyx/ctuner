@@ -32,11 +32,8 @@ let package = Package(
         .executable(name: "tuner-run", targets: ["TunerRun"]),
         .executable(name: "GoldenGenerator", targets: ["GoldenGenerator"]),
         .executable(name: "GoldenReference", targets: ["GoldenReference"]),
-        // Named Tuner so the linker signs the binary with today's
-        // identifier, which the microphone grant is tied to
-        .executable(name: "Tuner", targets: ["TunerAppKit"]),
-        // Stage 2: the SwiftUI window. Until the stage 1 app goes, it
-        // is bundled and signed as Tuner by Scripts/package-app.sh
+        // The SwiftUI window, bundled and signed as Tuner by
+        // Scripts/package-app.sh
         .executable(name: "TunerApp", targets: ["TunerApp"]),
     ],
     targets: [
@@ -51,8 +48,6 @@ let package = Package(
             name: "TunerCapture",
             publicHeadersPath: "include",
             linkerSettings: [
-                .linkedFramework("AudioToolbox"),
-                .linkedFramework("CoreAudio", .when(platforms: [.macOS])),
                 .linkedFramework("AVFAudio"),
             ]),
 
@@ -69,35 +64,7 @@ let package = Package(
             dependencies: ["TunerState"],
             linkerSettings: [.linkedFramework("AVFAudio")]),
 
-        // Stage 1: today's AppKit window on the new core. swift/Makefile
-        // copies this binary into Tuner.app.
-        .executableTarget(
-            name: "TunerAppKit",
-            dependencies: ["TunerCore", "TunerCapture", "TunerState"],
-            path: "swift",
-            exclude: [
-                "Info.plist",
-                "Makefile",
-                "PkgInfo",
-                "README",
-                "README.md",
-                "Tuner.entitlements",
-                "Tuner.png",
-            ],
-            sources: [
-                "AppDelegate.swift",
-                "DisplayView.swift",
-                "MeterView.swift",
-                "ScopeView.swift",
-                "SpectrumView.swift",
-                "StaffView.swift",
-                "StrobeView.swift",
-                "TunerView.swift",
-                "main.swift",
-            ],
-            swiftSettings: [.swiftLanguageMode(.v5)]),
-
-        // Stage 2: the SwiftUI window on the same state layer
+        // The SwiftUI window on the same state layer
         .executableTarget(
             name: "TunerApp",
             dependencies: ["TunerState"],

@@ -21,19 +21,6 @@ import TunerCapture
 @Suite("capture status")
 struct CaptureStatusTests
 {
-    // A device whose minimum is above the block gets its minimum,
-    // where today's loop never stopped halving
-    @Test func bufferSizeStopsAtDeviceMinimum()
-    {
-        #expect(CaptureBufferFrames(2048, 4096) == 2048)
-    }
-
-    // A device that takes the block gets the block
-    @Test func bufferSizeTakesBlockInRange()
-    {
-        #expect(CaptureBufferFrames(256, 4096) == 1024)
-    }
-
     @Test(arguments: [
         (kCaptureStatusOK, "OK"),
         (kCaptureStatusNoMemory, "Out of memory"),

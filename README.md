@@ -3,7 +3,7 @@
 A musical instrument strobe tuner with cents and frequency
 display. With additional features useful for tuning accordions or
 melodeons. The strobe display may be replaced with the staff, if
-required. This fork is the [Mac](swift) app, with a legacy
+required. This fork is the [Mac](App) app, with a legacy
 [Linux](linux) port. An
 [Android](https://github.com/billthefarmer/tuner) version is
 available, also on
@@ -17,9 +17,10 @@ available, also on
 
 ## Using
 
-See [swift/README.md](swift/README.md) for the Mac app's features,
-keyboard shortcuts and click actions. Build it with `make` in the
-`swift` directory.
+See [App/README.md](App/README.md) for the Mac app's features,
+keyboard shortcuts and click actions. Build it with `make app` at the
+top of the repository, which needs only the Command Line Tools and
+leaves `.build/Tuner.app`; `make dmg` also makes the disk image.
 
 ## How it works
 

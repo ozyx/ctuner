@@ -4,8 +4,6 @@
 *.app
 *.dSYM
 *.dmg
-swift/Tuner
-swift/Tuner.icns
 
 # Compound Engineering config (dotfiles are ignored above)
 !.compound-engineering/
