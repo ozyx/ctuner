@@ -29,6 +29,7 @@ let package = Package(
         .library(name: "TunerCore", targets: ["TunerCore"]),
         .library(name: "TunerCapture", targets: ["TunerCapture"]),
         .library(name: "TunerState", targets: ["TunerState"]),
+        .executable(name: "tuner-run", targets: ["TunerRun"]),
         .executable(name: "GoldenGenerator", targets: ["GoldenGenerator"]),
         .executable(name: "GoldenReference", targets: ["GoldenReference"]),
         // Named Tuner so the linker signs the binary with today's
@@ -56,6 +57,14 @@ let package = Package(
         .target(
             name: "TunerState",
             dependencies: ["TunerCore", "TunerCapture"]),
+
+        // Sound sources for the tuner: tones and files, the headless
+        // run and its verdict. Not a product; the executables and, later,
+        // the app link it.
+        .target(
+            name: "TunerSource",
+            dependencies: ["TunerState"],
+            linkerSettings: [.linkedFramework("AVFAudio")]),
 
         // Stage 1: today's AppKit window on the new core. swift/Makefile
         // copies this binary into Tuner.app.
@@ -85,6 +94,12 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
 
+        // Prints the tuner's readings for a tone or a file and can pass
+        // or fail them against a target note
+        .executableTarget(
+            name: "TunerRun",
+            dependencies: ["TunerSource"]),
+
         // Writes deterministic float32 fixture inputs
         .executableTarget(name: "GoldenGenerator"),
 
@@ -107,5 +122,9 @@ let package = Package(
         .testTarget(
             name: "TunerStateTests",
             dependencies: ["TunerState"]),
+
+        .testTarget(
+            name: "TunerSourceTests",
+            dependencies: ["TunerSource", "TunerState"]),
     ]
 )

@@ -111,4 +111,107 @@ struct EngineTests
         let hop = try! play(engine, sine())
         #expect(hop?.found == false)
     }
+
+    // The per-block call and the threaded path give the same hops
+    @Test func processBlockMatchesThreadedPath() throws
+    {
+        let samples = sine(seconds: 64 * 1024 / kRate)
+        let block = 1024
+
+        let direct = try Engine(sampleRate: kRate)
+        var expected: [Hop] = []
+        for start in stride(from: 0, to: samples.count - block + 1,
+                            by: block)
+        {
+            let hop = try samples[start ..< start + block]
+              .withUnsafeBufferPointer { try direct.processBlock($0) }
+            expected.append(hop)
+        }
+        #expect(expected.count == 64)
+
+        let threaded = try Engine(sampleRate: kRate)
+        let hops = DispatchSemaphore(value: 0)
+        let seen = HopLog()
+        try threaded.start
+        {
+            if let hop = threaded.acquire()?.hop
+            {
+                seen.append(hop)
+            }
+            hops.signal()
+        }
+        defer { threaded.stop() }
+
+        for start in stride(from: 0, to: samples.count - block + 1,
+                            by: block)
+        {
+            samples[start ..< start + block].withUnsafeBufferPointer
+            {
+                threaded.push($0)
+            }
+            #expect(hops.wait(timeout: .now() + 10) == .success)
+        }
+
+        #expect(seen.hops == expected)
+    }
+
+    @Test func processBlockThrowsWhileRunning() throws
+    {
+        let engine = try Engine(sampleRate: kRate)
+        try engine.start {}
+        defer { engine.stop() }
+
+        let block = [Float](repeating: 0, count: 1024)
+        #expect(throws: EngineError.self)
+        {
+            try block.withUnsafeBufferPointer { try engine.processBlock($0) }
+        }
+
+        // The thread is still running: a second start is refused
+        #expect(throws: EngineError.self) { try engine.start {} }
+    }
+
+    @Test func processBlockRefusesShortBlock() throws
+    {
+        let engine = try Engine(sampleRate: kRate)
+        let block = [Float](repeating: 0, count: 100)
+        #expect(throws: EngineError.self)
+        {
+            try block.withUnsafeBufferPointer { try engine.processBlock($0) }
+        }
+    }
+
+    @Test func countsOverruns() throws
+    {
+        let engine = try Engine(sampleRate: kRate)
+        #expect(engine.overruns == 0)
+
+        // Nothing drains the ring, so an oversized push is dropped
+        let huge = [Float](repeating: 0, count: 1 << 22)
+        huge.withUnsafeBufferPointer { engine.push($0) }
+        #expect(engine.overruns == 1)
+    }
+}
+
+// The hops the callback saw, in order
+private final class HopLog: @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var store: [Hop] = []
+
+    // append
+    func append(_ hop: Hop)
+    {
+        lock.lock()
+        defer { lock.unlock() }
+        store.append(hop)
+    }
+
+    // hops
+    var hops: [Hop]
+    {
+        lock.lock()
+        defer { lock.unlock() }
+        return store
+    }
 }

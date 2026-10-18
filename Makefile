@@ -36,7 +36,7 @@ COREOBJECTS = $(patsubst $(CORE)/%.c,$(COREBUILD)/%.o,$(CORESOURCES))
 CORECFLAGS = -O2 -Wall -Wextra -Werror -I$(CORE)/include
 FORBIDDEN = '_objc_|_OBJC_|_NS|_CF|_os_log|_syslog|_asl_|printf|_puts|_fputs|_putchar|_fwrite|_perror'
 
-.PHONY: build app test test-release sanitize core-check core-leaks fixtures fixture-screen clean
+.PHONY: build app test test-release sanitize core-check core-leaks fixtures fixture-screen tone-checks clean
 
 build:
 	$(SWIFT) build -c release
@@ -81,6 +81,11 @@ fixtures:
 	$(SWIFT) build -c release --product GoldenGenerator
 	$(SWIFT) build -c release --product GoldenReference
 	Scripts/fixtures.sh $(BIN)/GoldenGenerator $(BIN)/GoldenReference $(FIXTURES)
+
+# Run tuner-run over known tones, each with the exit code it must give
+tone-checks:
+	$(SWIFT) build -c release --product tuner-run
+	Scripts/tone-checks.sh $(BIN)/tuner-run
 
 # Rebuild the reference at other optimisation levels and under the
 # sanitizers, and check that every fixture holds
