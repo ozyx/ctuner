@@ -63,6 +63,9 @@ public final class Engine: @unchecked Sendable
     // Set before the thread starts and cleared after it stops
     private var onHop: (@Sendable () -> Void)?
 
+    // The slot processBlock publishes into, for a caller with no thread
+    private let blockSlot: OpaquePointer
+
     // init(sampleRate:temperaments:)
     public init(sampleRate: Double,
                 temperaments: [Double] = Temperaments.flattened)
@@ -79,13 +82,21 @@ public final class Engine: @unchecked Sendable
             throw EngineError(status)
         }
 
+        guard let slot = TunerSlotCreate() else
+        {
+            TunerEngineDestroy(engine)
+            throw EngineError(kTunerStatusNoMemory)
+        }
+
         self.sampleRate = sampleRate
         handle = engine
+        blockSlot = slot
     }
 
     deinit
     {
         TunerEngineDestroy(handle)
+        TunerSlotDestroy(blockSlot)
     }
 
     // start: run the analysis thread; onHop runs on that thread after
@@ -121,6 +132,35 @@ public final class Engine: @unchecked Sendable
     public func push(_ samples: UnsafeBufferPointer<Float>)
     {
         TunerEnginePush(handle, samples.baseAddress, Int32(samples.count))
+    }
+
+    // overruns: pushes dropped because the ring was full
+    public var overruns: UInt64
+    {
+        return TunerEngineOverruns(handle)
+    }
+
+    // processBlock: analyse one block of kTunerBlock samples on the
+    // caller's thread and return its hop, bypassing the ring; throws
+    // while the analysis thread runs
+    public func processBlock(_ block: UnsafeBufferPointer<Float>)
+      throws(EngineError) -> Hop
+    {
+        guard block.count >= Int(kTunerBlock) else
+        {
+            throw EngineError(kTunerStatusBadArgument)
+        }
+
+        let status = TunerEngineProcessBlock(handle, block.baseAddress,
+                                             blockSlot)
+        guard status == kTunerStatusOK else
+        {
+            throw EngineError(status)
+        }
+
+        var snapshot = TunerSnapshot()
+        TunerSlotView(blockSlot, &snapshot)
+        return Hop(snapshot)
     }
 
     // acquire: the newest snapshot if it is newer than the last one
