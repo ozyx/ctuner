@@ -269,6 +269,25 @@ struct SettingsTests
         settings.contractSpectrum()
         #expect(settings.expand == 1)
 
+        // An out of range value, set or saved, is clamped, so the cycle
+        // never sticks or traps
+        for (value, clamped, expanded, contracted) in
+              [(0, 1, 2, 16), (-4, 1, 2, 16), (32, 16, 1, 8),
+               (Int.max, 16, 1, 8)]
+        {
+            let saved = Suite()
+            saved.defaults.set(value, forKey: "expand")
+            #expect(Settings(defaults: saved.defaults).expand == clamped)
+
+            settings.expand = value
+            #expect(settings.expand == clamped)
+            settings.expandSpectrum()
+            #expect(settings.expand == expanded)
+            settings.expand = value
+            settings.contractSpectrum()
+            #expect(settings.expand == contracted)
+        }
+
         settings.colour = 0
         var colours: [Int] = []
         for _ in 0 ..< 4

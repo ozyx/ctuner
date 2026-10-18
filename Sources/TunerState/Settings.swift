@@ -239,7 +239,16 @@ public final class Settings
     // Spectrum expand, 1 to 16
     public var expand: Int
     {
-        didSet { defaults.set(expand, forKey: Key.expand) }
+        didSet
+        {
+            let clamped = Settings.clamp(expand, Settings.expandRange)
+            if clamped != expand
+            {
+                expand = clamped
+                return
+            }
+            defaults.set(expand, forKey: Key.expand)
+        }
     }
 
     // The inspector's visibility
@@ -320,7 +329,8 @@ public final class Settings
         octaves = Settings.flags(Settings.read(defaults, Key.octaves, nil,
                                                (1 << Settings.octaveCount) - 1),
                                  Settings.octaveCount)
-        expand = Settings.read(defaults, Key.expand, nil, 1)
+        expand = Settings.clamp(Settings.read(defaults, Key.expand, nil, 1),
+                                Settings.expandRange)
         inspector = Settings.read(defaults, Key.inspector, nil, false)
     }
 

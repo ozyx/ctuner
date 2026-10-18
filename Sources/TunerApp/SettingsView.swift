@@ -54,6 +54,7 @@ struct GeneralSettings: View
 {
     @Environment(AppModel.self) private var model
     @LocalState private var text = ""
+    @LocalState private var shown = ""
     @FocusState private var focused: Bool
 
     var body: some View
@@ -117,18 +118,22 @@ struct GeneralSettings: View
         }
     }
 
-    // show: the current reference in the field
+    // show: the current reference in the field, remembered so an
+    // unedited field is not committed
     private func show()
     {
-        text = model.settings.reference.formatted(.number.precision(
+        shown = model.settings.reference.formatted(.number.precision(
           .fractionLength(0 ... 2)).grouping(.never))
+        text = shown
     }
 
-    // commit: take the field if it holds a reference in range, and show
-    // the stored one either way (R33)
+    // commit: take the field if it was edited and holds a reference in
+    // range, and show the stored one either way (R33); an unedited field
+    // would round a reference with more than two decimals
     private func commit()
     {
-        if let value = try? Double(text.trimmingCharacters(in: .whitespaces),
+        if text != shown,
+           let value = try? Double(text.trimmingCharacters(in: .whitespaces),
                                    format: .number),
            TunerState.Settings.referenceRange.contains(value)
         {

@@ -54,6 +54,7 @@ struct TunerCommands: Commands
                 .keyboardShortcut("c")
             Button("Paste") { send(#selector(NSText.paste(_:))) }
                 .keyboardShortcut("v")
+            Button("Delete") { send(#selector(NSText.delete(_:))) }
             Button("Select All") { send(#selector(NSText.selectAll(_:))) }
                 .keyboardShortcut("a")
         }
