@@ -57,6 +57,9 @@ public final class Engine: @unchecked Sendable
 {
     public let sampleRate: Double
 
+    // Samples in one block, the unit processBlock and each hop take
+    public static let blockSize = Int(kTunerBlock)
+
     // The core handle, for the capture layer to push into
     public let handle: OpaquePointer
 
@@ -146,7 +149,7 @@ public final class Engine: @unchecked Sendable
     public func processBlock(_ block: UnsafeBufferPointer<Float>)
       throws(EngineError) -> Hop
     {
-        guard block.count >= Int(kTunerBlock) else
+        guard block.count >= Engine.blockSize else
         {
             throw EngineError(kTunerStatusBadArgument)
         }
