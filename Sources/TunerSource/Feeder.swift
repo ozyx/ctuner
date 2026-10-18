@@ -116,7 +116,7 @@ public final class Feeder: @unchecked Sendable
         while true
         {
             lock.lock()
-            let running = run != nil && !(run!.cancelled) && !ended
+            let running = (run.map { !$0.cancelled } ?? false) && !ended
             lock.unlock()
 
             if !running
