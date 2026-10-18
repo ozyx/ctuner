@@ -95,8 +95,9 @@ struct ReadoutPlaceholder: View
             }
 
             Text(model.display.copyLine(transpose: model.settings.transpose)
-                   ?? "Readout")
-                .foregroundStyle(.secondary)
+                   ?? model.captureFailure ?? "Readout")
+                .foregroundStyle(model.display.isStale ? .tertiary
+                                                       : .secondary)
         }
     }
 }

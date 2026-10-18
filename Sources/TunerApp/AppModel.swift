@@ -18,7 +18,9 @@
 //  The app-level model, injected through the environment. It owns the
 //  settings and the display model and holds the actions the toolbar,
 //  the menus, the bare keys and the pane clicks share, so each mirror
-//  of a toggle reads the same state.
+//  of a toggle reads the same state. It also owns the capture
+//  controller and folds the main window's occlusion and the app being
+//  hidden into the one visibility flag that controller follows (KTD9).
 
 import AppKit
 import Observation
@@ -29,6 +31,97 @@ final class AppModel
 {
     let settings = Settings()
     let display = DisplayModel()
+
+    // Nil when the backend could not be made; captureFailure then says
+    // why, for the failed view U19 adds
+    private(set) var capture: CaptureController?
+    private(set) var captureFailure: String?
+
+    // The main window and the one visibility flag derived from it
+    private weak var window: NSWindow?
+    private(set) var isVisible = true
+
+    init()
+    {
+        do
+        {
+            let backend = try EngineBackend()
+            capture = CaptureController(backend: backend, model: display,
+                                        settings: settings)
+        }
+
+        catch
+        {
+            captureFailure = error.message
+        }
+
+        // The first activation is the first start and the permission
+        // request (R30); later ones retry a denied, absent or failed input
+        observe(NSApplication.didBecomeActiveNotification)
+        {
+            $0.capture?.activate()
+        }
+
+        observe(NSApplication.didHideNotification)
+        {
+            $0.updateVisibility()
+        }
+
+        observe(NSApplication.didUnhideNotification)
+        {
+            $0.updateVisibility()
+        }
+
+        observe(NSWindow.didChangeOcclusionStateNotification)
+        {
+            $0.updateVisibility()
+        }
+    }
+
+    // observe: run an action on the main actor for each notification
+    private func observe(_ name: Notification.Name,
+                         _ action: @escaping (AppModel) -> Void)
+    {
+        Task
+        {
+            [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: name)
+            {
+                guard let self else
+                {
+                    return
+                }
+
+                action(self)
+            }
+        }
+    }
+
+    // attach: the main window, reported by the root view
+    func attach(window: NSWindow)
+    {
+        self.window = window
+        updateVisibility()
+    }
+
+    // updateVisibility: visible means the window shows on screen and
+    // the app is not hidden; a minimised or covered window is occluded
+    private func updateVisibility()
+    {
+        guard let window else
+        {
+            return
+        }
+
+        let visible = window.occlusionState.contains(.visible) &&
+                      !NSApplication.shared.isHidden
+        if visible != isVisible
+        {
+            isVisible = visible
+        }
+
+        capture?.setVisible(visible)
+    }
 
     // toggleLock
     func toggleLock()

@@ -15,8 +15,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  Closing the last window quits (R34); the visibility observers
-//  arrive with capture in U18.
+//  Closing the last window quits (R34). The activation and visibility
+//  observers that drive capture live in AppModel.
 
 import AppKit
 
