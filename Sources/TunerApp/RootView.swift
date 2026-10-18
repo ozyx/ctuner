@@ -69,7 +69,18 @@ struct RootView: View
     {
         @Bindable var settings = model.settings
 
-        MainArea()
+        Group
+        {
+            if model.mainArea.isStatus
+            {
+                StatusContent(area: model.mainArea)
+            }
+
+            else
+            {
+                TunerPanes()
+            }
+        }
             // Room for the toolbar items in one row and, in the main
             // area, eight reed rows, the meter and a strobe tall
             // enough to read; U11 confirms it against the real rows
@@ -83,7 +94,8 @@ struct RootView: View
             .toolbar(id: "main")
             {
                 TunerToolbar(settings: model.settings,
-                             display: model.display)
+                             display: model.display,
+                             lockEnabled: !model.mainArea.isStatus)
             }
     }
 }

@@ -84,8 +84,10 @@ struct TunerCommands: Commands
         {
             Button("Copy Readout") { model.copyReadout() }
                 .keyboardShortcut("c", modifiers: [])
+                .disabled(!model.canCopy)
             Toggle("Lock Display", isOn: $display.isLocked)
                 .keyboardShortcut("l", modifiers: [])
+                .disabled(model.mainArea.isStatus)
             Button("Change Strobe Colours") { settings.cycleColour() }
                 .keyboardShortcut("k", modifiers: [])
 
