@@ -404,6 +404,28 @@ struct CaptureControllerTests
         #expect(rig.controller.state == .running(44100))
     }
 
+    @Test func aFailedStartRetriesOnAConfigurationChange()
+    {
+        let rig = Rig()
+        rig.backend.permission = .granted
+        let error = CaptureError(kCaptureStatusStart)
+        rig.backend.failStart = error
+
+        rig.controller.activate()
+        #expect(rig.controller.state == .failed(error.message))
+        #expect(rig.controller.engine == nil)
+
+        // The device changes and the start succeeds this time: a fresh
+        // core at the new rate, with the app never activated again
+        rig.backend.failStart = nil
+        rig.backend.inputSampleRate = 48000
+        rig.backend.change()
+        #expect(rig.controller.state == .running(48000))
+        #expect(rig.controller.engine?.sampleRate == 48000)
+        #expect(rig.backend.running === rig.controller.engine)
+        #expect(rig.settings.engine === rig.controller.engine)
+    }
+
     @Test func hopsReachTheDisplayModel() async throws
     {
         let rig = Rig()
