@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Headless Audio Input</title>
+<style>
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --text: #1d1d1f; --muted: #5b5b60;
+  --border: #e3e0d8; --accent: #1f5f8b; --accent-soft: #e6f0f7; --accent-text: #174a6c;
+  --warn-soft: #fbf1e3; --warn-text: #7a4a10; --ok-soft: #e8f3ea; --ok-text: #22562d;
+  --code-bg: #f1efe9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a; --surface: #1f2023; --text: #e8e6e1; --muted: #a8a6a0;
+    --border: #34353a; --accent: #7fb6dd; --accent-soft: #1d2d3a; --accent-text: #a9d0ec;
+    --warn-soft: #3a2c19; --warn-text: #f0c98d; --ok-soft: #1d3022; --ok-text: #a6dbb1;
+    --code-bg: #2a2b2f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a; --surface: #1f2023; --text: #e8e6e1; --muted: #a8a6a0;
+  --border: #34353a; --accent: #7fb6dd; --accent-soft: #1d2d3a; --accent-text: #a9d0ec;
+  --warn-soft: #3a2c19; --warn-text: #f0c98d; --ok-soft: #1d3022; --ok-text: #a6dbb1;
+  --code-bg: #2a2b2f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+main { max-width: 900px; margin-inline: auto; padding: 2rem 16px 4rem; }
+p, li, dd { max-width: 72ch; }
+h1 { font-size: 1.75rem; line-height: 1.25; margin: .25rem 0 .5rem; }
+h2 { font-size: 1.35rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.12rem; margin: 0 0 .5rem; }
+.eyebrow { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.meta { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; margin: .5rem 0 1rem; padding: 0; }
+.meta div { display: flex; gap: .4rem; }
+.meta dt { color: var(--muted); font-weight: 600; }
+.meta dd { margin: 0; }
+code { font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code-bg); padding: .1em .3em; border-radius: 4px; overflow-wrap: anywhere; }
+.callout { background: var(--accent-soft); color: var(--text); border-radius: 8px; padding: 1rem 1.1rem; margin: 1rem 0; }
+.callout .eyebrow { color: var(--accent-text); }
+.callout.warn { background: var(--warn-soft); }
+.callout.warn .eyebrow { color: var(--warn-text); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; margin: 1rem 0; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .7rem .9rem; }
+.stat b { display: block; font-size: 1.4rem; }
+.stat span { color: var(--muted); font-size: .85rem; }
+article.idea { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.2rem; margin: 1.1rem 0; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .2rem 0 .8rem; }
+.chip { font-size: .78rem; padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.chip.id { background: var(--accent-soft); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+dl.fields { margin: 0; }
+dl.fields dt { font-weight: 700; font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-top: .8rem; }
+dl.fields dd { margin: .2rem 0 0; }
+dl.fields ul { margin: .2rem 0; padding-left: 1.2rem; }
+strong { color: inherit; }
+nav.jump ol { padding-left: 1.4rem; }
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { text-align: left; vertical-align: top; padding: .5rem .55rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+.table-wrap { overflow-x: auto; }
+figure { margin: 1rem 0; }
+figure svg { width: 100%; height: auto; display: block; }
+figcaption { font-size: .85rem; color: var(--muted); margin-top: .4rem; }
+svg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+svg .box.hl { fill: var(--accent-soft); stroke: var(--accent); }
+svg .lbl { fill: var(--text); font: 13px -apple-system, Helvetica, Arial, sans-serif; }
+svg .sub { fill: var(--muted); font: 11px -apple-system, Helvetica, Arial, sans-serif; }
+svg .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+svg .ah { fill: var(--muted); }
+footer.composition-signal { margin-top: 3rem; font-size: .8rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: .8rem; }
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="eyebrow">Ideation</div>
+<h1>Ideation: testing the tuner's audio input without the laptop, speakers or a quiet room</h1>
+<dl class="meta">
+<div><dt>Date</dt><dd><time datetime="2026-10-17">2026-10-17</time></dd></div>
+<div><dt>Topic</dt><dd><code>headless-audio-input</code></dd></div>
+<div><dt>Mode</dt><dd>repo-grounded</dd></div>
+</dl>
+<p><strong>Focus:</strong> testing the audio input means giving up the laptop to play tones and record analytics, or keeping a room quiet, which is close to impossible with a newborn. Can the tuner read from a virtual audio input so these checks run headless?</p>
+</header>
+
+<section class="callout">
+<div class="eyebrow">Short answer</div>
+<p>Yes. Since stage 1 merged (PR #5, <code>16fd1d2</code>), the app reaches the microphone through one call: <code>CaptureCreate(capturePush, context, &amp;capture)</code> at <code>swift/AppDelegate.swift:603</code>. Anything that calls the same <code>CapturePush</code> callback with float samples looks like a microphone to the engine. A file or tone source behind that call is a virtual input with no driver, no mic permission and no sound in the room. A loopback driver such as BlackHole still has a use, but only for checking the real CoreAudio path by hand.</p>
+</section>
+
+<div class="stats">
+<div class="stat"><b>47</b><span>raw ideas from 5 agents</span></div>
+<div class="stat"><b>23</b><span>after merging duplicates</span></div>
+<div class="stat"><b>6</b><span>survivors</span></div>
+<div class="stat"><b>4</b><span>topic axes</span></div>
+</div>
+
+<section id="grounding-context">
+<h2>Grounding Context</h2>
+<h3>Codebase Context</h3>
+<ul>
+<li><strong>Capture today.</strong> <code>Sources/TunerCapture/CaptureHAL.m:192-202</code> opens only the system default input (<code>kAudioHardwarePropertyDefaultInputDevice</code>). There is no device picker and no UID lookup, and it asks the device for 44100 Hz. The callback hands samples to the engine through <code>typedef void (*CapturePush)(void *context, const float *samples, int count)</code> (<code>TunerCapture.h:65</code>).</li>
+<li><strong>Engine.</strong> A plain C core with no globals, running on its own thread. It reads 1024-sample hops from a ring of 32768 floats that drops whole blocks on overflow, and publishes a per-hop snapshot (found, note, cents, frequency, reference, count). <code>Engine.swift</code> exposes <code>push</code>, <code>start(onHop:)</code> and <code>acquire()</code>. <code>TunerEngineAcquire</code> allows only one consumer.</li>
+<li><strong>Tests.</strong> <code>make test</code> runs in CI and replays 28 golden fixtures (raw float32 <code>.bin</code> plus <code>.header</code>) produced by a frozen copy of the old <code>Audio.m</code>. The fixtures cover sines, harmonic stacks, white noise and silence. The plan's rule is "Tests never open an audio device" (plan:909). Everything that needs hardware is on a manual checklist on the owner's Mac.</li>
+<li><strong>Gaps.</strong> No fixture mixes noise with a tone, starts from silence, or uses a real instrument. No per-hop results are logged or exported anywhere. The only export is the "c" key, which copies one line. The test helpers that turn a file into per-hop records (<code>CoreRunner.swift</code>, <code>RunningEngine.swift</code>) live only in the test target.</li>
+<li><strong>How checks run now.</strong> Sine WAVs go through the speakers with <code>afplay</code> into the built-in mic, with window captures and CGEvent clicks. One run failed because AirPods were the default input and output. The owner runs measurement commands on the running app themselves.</li>
+<li><strong>What comes next.</strong> Stage 2 replaces <code>CaptureHAL.m</code> with AVAudioEngine and follows the default device (plan KTD8, U9). Anything built at the <code>CapturePush</code> level, or above it in the app, carries over.</li>
+<li><strong>Project boundaries.</strong> STRATEGY.md rules out work on the Linux port and code signing for now.</li>
+</ul>
+<h3>Past learnings</h3>
+<p><code>docs/solutions/ui-bugs/appkit-views-draw-at-window-size-from-dirtyrect.md</code> is about drawing, not audio. It is a reminder that some bugs only show in the running app.</p>
+<h3>External context</h3>
+<ul>
+<li>BlackHole (GPL-3, <code>brew install blackhole-2ch</code>) is the usual macOS loopback driver. libASPL (MIT) can build a virtual input that generates a tone inside coreaudiod. Apple's TN2091 shows how to pick an input by UID (<code>kAudioHardwarePropertyTranslateUIDToDevice</code>, then <code>kAudioOutputUnitProperty_CurrentDevice</code>).</li>
+<li>GitHub's macOS runners sometimes have no audio device. One report puts it at about 30% of runs (runner-images #13668). Microphone permission prompts have hung CI before (#9330). A virtual device probably still needs the mic grant. So CI should feed samples in software, not through a device.</li>
+<li>Pitch-detector test suites (aubio, sevagh/pitch-detection) use generated sines, silence cases, real instrument clips and degraded audio. mir_eval scores the share of frames within 50 cents.</li>
+<li>Sample sources: the University of Iowa instrument samples ("without restrictions") and NSynth (CC BY 4.0). MDB-stem-synth is non-commercial only.</li>
+</ul>
+</section>
+
+<section id="topic-axes">
+<h2>Topic Axes</h2>
+<ol>
+<li>Where samples enter</li>
+<li>Test signals</li>
+<li>Observing results</li>
+<li>Where and when checks run</li>
+</ol>
+</section>
+
+<section id="ranked-ideas">
+<h2>Ranked Ideas</h2>
+<nav class="jump" aria-label="Ranked ideas">
+<ol>
+<li><a href="#idea-1">A file or tone input for the real app, chosen at launch</a></li>
+<li><a href="#idea-2"><code>tuner-run</code>: sound file in, one line of numbers per hop out</a></li>
+<li><a href="#idea-3">Record a real sound once, replay it forever</a></li>
+<li><a href="#idea-4">The house as a test signal: tones mixed into recorded household noise</a></li>
+<li><a href="#idea-5">A tuner scorecard on scenes with a known answer</a></li>
+<li><a href="#idea-6">Pick the input device by UID, for a silent manual check through BlackHole</a></li>
+</ol>
+</nav>
+
+<figure>
+<svg viewBox="0 0 860 250" role="img" aria-labelledby="bench-title">
+<title id="bench-title">Input sources feed one push call; the engine's hop records go to a log and a scorecard</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="box" x="10" y="15" width="200" height="46" rx="6"/>
+<text class="lbl" x="22" y="36">Mic (CaptureHAL, today)</text>
+<text class="sub" x="22" y="52">needs room, speakers, grant</text>
+<rect class="box hl" x="10" y="78" width="200" height="46" rx="6"/>
+<text class="lbl" x="22" y="99">file: / tone:  (idea 1)</text>
+<text class="sub" x="22" y="115">no device, no grant</text>
+<rect class="box" x="10" y="141" width="200" height="46" rx="6"/>
+<text class="lbl" x="22" y="162">device:&lt;uid&gt;  (idea 6)</text>
+<text class="sub" x="22" y="178">BlackHole, manual check</text>
+<rect class="box" x="10" y="200" width="200" height="40" rx="6"/>
+<text class="lbl" x="22" y="225">recorded takes (ideas 3, 4)</text>
+<path class="arrow" d="M210,38 L300,118" marker-end="url(#ah)"/>
+<path class="arrow" d="M210,101 L300,122" marker-end="url(#ah)"/>
+<path class="arrow" d="M210,164 L300,128" marker-end="url(#ah)"/>
+<path class="arrow" d="M210,220 L300,132" marker-end="url(#ah)"/>
+<rect class="box hl" x="304" y="100" width="150" height="50" rx="6"/>
+<text class="lbl" x="318" y="122">CapturePush</text>
+<text class="sub" x="318" y="139">float samples</text>
+<path class="arrow" d="M454,125 L500,125" marker-end="url(#ah)"/>
+<rect class="box" x="504" y="100" width="140" height="50" rx="6"/>
+<text class="lbl" x="518" y="122">C engine</text>
+<text class="sub" x="518" y="139">1024-sample hops</text>
+<path class="arrow" d="M644,112 L700,70" marker-end="url(#ah)"/>
+<path class="arrow" d="M644,138 L700,180" marker-end="url(#ah)"/>
+<rect class="box" x="704" y="40" width="146" height="50" rx="6"/>
+<text class="lbl" x="716" y="62">Window (as now)</text>
+<text class="sub" x="716" y="79">strobe, meter, readout</text>
+<rect class="box hl" x="704" y="155" width="146" height="50" rx="6"/>
+<text class="lbl" x="716" y="177">Hop log (idea 2)</text>
+<text class="sub" x="716" y="194">→ scorecard (idea 5)</text>
+</svg>
+<figcaption>Every source reaches the engine through the same push call, so the engine can't tell a file from a microphone. The highlighted path needs no device and no room.</figcaption>
+</figure>
+
+<article class="idea" id="idea-1">
+<div class="eyebrow">Idea 1</div>
+<h3>1. A file or tone input for the real app, chosen at launch</h3>
+<div class="chips"><span class="chip id">Rank 1</span><span class="chip">Axis: Where samples enter</span><span class="chip">Confidence 85%</span><span class="chip">Complexity Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>Add an input-source setting that the app resolves before it calls <code>CaptureCreate</code>. <code>file:take.wav</code> or <code>tone:440</code> starts a small feeder thread. It pushes 1024-sample blocks through the same <code>CapturePush</code> callback, paced at real time, and reports its own sample rate. The setting is a UserDefaults key, so it works straight from the shell: <code>open Tuner.app --args -InputSource file:take.wav</code>. The whole app runs (window, strobe, meter, readout) and the microphone is never opened.</dd>
+<dt>Axis</dt>
+<dd>Where samples enter</dd>
+<dt>Basis</dt>
+<dd><ul>
+<li><code>direct:</code> <code>swift/AppDelegate.swift:603</code> <code>let status = CaptureCreate(capturePush, context, &amp;capture)</code>, and the engine is built from <code>CaptureSampleRate(capture)</code> at :613. One call site, one rate source.</li>
+<li><code>direct:</code> <code>TunerCapture.h:65</code> <code>typedef void (*CapturePush)(void *context, const float *samples, int count)</code>.</li>
+<li><code>direct:</code> <code>Sources/GoldenReference/main.m:64-68</code> already feeds canned 1024-frame blocks to the old capture code, so blocks from a file are a proven way in.</li>
+<li><code>external:</code> Cocoa's argument domain lets <code>-Key value</code> on the command line override UserDefaults. Voice-pipeline CI paces replay at real frame duration.</li>
+</ul></dd>
+<dt>Rationale</dt>
+<dd>This is the "virtual audio input" asked for, built in software. There is no driver to install, no mic prompt, no speakers and no room noise, and the owner can keep working while it plays. Pacing at real time keeps the ring, the hop thread and the 20 ms redraw timer running as they do live. The existing window-capture and click scripts then work on silent, repeatable input.</dd>
+<dt>Downsides</dt>
+<dd>It does not test <code>CaptureHAL.m</code> itself; idea 6 covers that. It needs a WAV reader (ExtAudioFile is the easy choice), and files at another rate must either be resampled or passed through as that rate. Stage 2 replaces <code>CaptureHAL.m</code>, so the selector belongs in the app layer, not inside the HAL file. Launching the app on the owner's Mac still needs the owner's go-ahead each time.</dd>
+<dt>Confidence</dt><dd>85%</dd>
+<dt>Complexity</dt><dd>Medium</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-2">
+<div class="eyebrow">Idea 2</div>
+<h3>2. <code>tuner-run</code>: sound file in, one line of numbers per hop out</h3>
+<div class="chips"><span class="chip id">Rank 2</span><span class="chip">Axis: Observing results</span><span class="chip">Confidence 85%</span><span class="chip">Complexity Low–Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>A small command-line tool on the engine, with no AppKit. It takes a WAV or a tone spec plus the app's settings (reference, temperament, key, filter, downsample, note filter). It writes one JSON line per hop: time, found, note, cents, frequency, reference, count, overruns. The default mode runs faster than real time through <code>TunerEngineProcessBlock</code> for CI. A paced mode goes through the ring and thread. "Record analytics" becomes <code>tuner-run cello.wav &gt; cello.jsonl</code>, and it runs over SSH, in CI or from an agent, with no window.</dd>
+<dt>Axis</dt>
+<dd>Observing results</dd>
+<dt>Basis</dt>
+<dd><ul>
+<li><code>direct:</code> <code>TunerCore.h:150</code> <code>TunerEngineProcessBlock</code> processes a block "on the caller's thread … bypassing the ring". <code>TunerSnapshot</code> (<code>TunerCore.h:80-98</code>) already holds found, note, deviation, frequency and count.</li>
+<li><code>direct:</code> <code>Tests/TunerCoreTests/Support/CoreRunner.swift:81</code> (<code>runCore</code>) and <code>RunningEngine.swift:18-20</code> already turn input into per-hop records, but only inside the test target.</li>
+<li><code>direct:</code> the evidence scan found no per-hop logging, CSV or JSON export anywhere. The plan's <code>measure</code> target (plan:874) is not built.</li>
+</ul></dd>
+<dt>Rationale</dt>
+<dd>Most of the code already exists as test scaffolding, so this mostly moves it into a product. Once one log format exists, the scorecard (idea 5), recorded takes (idea 3) and the noise sweep (idea 4) can all use it. A good first step: it changes no capture code and can merge on its own.</dd>
+<dt>Downsides</dt>
+<dd>The fast mode skips the ring and thread, so it can't see dropped blocks; that needs paced mode. If the live app should also write the log, it has to be the engine's single consumer, so the display and the log share one acquire loop. It needs the same WAV reader as idea 1.</dd>
+<dt>Confidence</dt><dd>85%</dd>
+<dt>Complexity</dt><dd>Low–Medium</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-3">
+<div class="eyebrow">Idea 3</div>
+<h3>3. Record a real sound once, replay it forever</h3>
+<div class="chips"><span class="chip id">Rank 3</span><span class="chip">Axis: Observing results</span><span class="chip">Confidence 70%</span><span class="chip">Complexity Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>The app keeps the last 30–60 seconds of raw input in a preallocated side ring, about 5–10 MB at 44.1 kHz. A key next to "c" dumps it as a <code>.bin</code> and <code>.header</code> in the existing fixture format, plus the hop log from idea 2. The header also records device name, sample rate and build commit. Any time the room happens to be usable, or a real instrument reads oddly, one keypress turns that moment into a file that ideas 1 and 2 can replay on any Mac. Each take can start with a short leader, two seconds of silence and then an exact 440 Hz tone, so a replay can confirm the file's sample rate is labelled right before trusting it.</dd>
+<dt>Axis</dt>
+<dd>Observing results</dd>
+<dt>Basis</dt>
+<dd><ul>
+<li><code>direct:</code> the evidence scan records "no recording of the input stream to disk" in either tree. The "c" key (<code>TunerView.swift:86-102</code>) copies one line.</li>
+<li><code>direct:</code> <code>Tests/TunerCoreTests/Fixtures/README.md</code> defines <code>NAME.bin</code> as float32 hops of 1024 samples plus a <code>.header</code> with <code>rate</code> and <code>hops</code>.</li>
+<li><code>direct:</code> plan KTD4: the audio callback does "nothing else, no allocation, no lock, no log". The tee therefore has to be a copy into a preallocated ring that another thread writes out.</li>
+<li><code>external:</code> QEMU record/replay logs only the non-deterministic inputs, audio included, and replays the rest exactly.</li>
+</ul></dd>
+<dt>Rationale</dt>
+<dd>Real-sound testing needs a quiet room and the laptop for minutes, not sessions. After that the recording does the work. It also catches problems the way they actually show up: someone notices something odd mid-use.</dd>
+<dt>Downsides</dt>
+<dd>Raw household audio must stay out of the public repo, so takes live in a local folder with a hash manifest. Real clips can't be judged against the frozen old engine: the fixture screen shows found, note and count flipping between builds on threshold cases, and the old engine has known undefined behaviour. Judge them with idea 5's scorecard, or by eye once.</dd>
+<dt>Confidence</dt><dd>70%</dd>
+<dt>Complexity</dt><dd>Medium</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-4">
+<div class="eyebrow">Idea 4</div>
+<h3>4. The house as a test signal: tones mixed into recorded household noise</h3>
+<div class="chips"><span class="chip id">Rank 4</span><span class="chip">Axis: Test signals</span><span class="chip">Confidence 70%</span><span class="chip">Complexity Low–Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>Record about a minute each of the real house, once, on any recorder: the white-noise machine, HVAC, kitchen, TV, the baby. Keep them local. A generator adds known tones and harmonic stacks to each bed at set signal-to-noise steps (+30 down to −10 dB). Because the tone is added in software, the right answer is exact. The output is a table: per pitch, the lowest SNR where the tuner still finds the note within 5 cents, and how often each bed alone produces a false note. The pitched sounds (a cry, speech, a kettle) show whether the tuner locks onto things that aren't instruments.</dd>
+<dt>Axis</dt>
+<dd>Test signals</dd>
+<dt>Basis</dt>
+<dd><ul>
+<li><code>direct:</code> the evidence scan: "No fixture mixes noise with a tone". The only noise fixture is white noise, <code>--noise 0.5:12345</code> (<code>Scripts/fixtures.sh:58-60</code>), and <code>GoldenTests.swift:115-125</code> checks only that noise alone is never found.</li>
+<li><code>direct:</code> plan:224 defers "A noise gate for quiet instruments in noisy rooms".</li>
+<li><code>external:</code> the Audio Degradation Toolbox mixes noise into clean audio for this kind of test. mir_eval scores the share of frames within tolerance.</li>
+</ul></dd>
+<dt>Rationale</dt>
+<dd>The obstacle becomes the test data. "Does it work in our house?" gets an answer at any hour on any machine. The deferred noise-gate decision gets a number to rest on instead of a guess.</dd>
+<dt>Downsides</dt>
+<dd>The tuner has no way to tell a voice from an instrument, so a cry that reads as a note is expected behaviour, not a bug. Treat the false-note rate as a measurement, not a pass/fail gate. Recording the beds uses idea 3's recorder or a phone. The beds hold family audio, so they stay out of git.</dd>
+<dt>Confidence</dt><dd>70%</dd>
+<dt>Complexity</dt><dd>Low–Medium</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-5">
+<div class="eyebrow">Idea 5</div>
+<h3>5. A tuner scorecard on scenes with a known answer</h3>
+<div class="chips"><span class="chip id">Rank 5</span><span class="chip">Axis: Test signals</span><span class="chip">Confidence 65%</span><span class="chip">Complexity Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>Extend the fixture generator from static tones to short scenes where the right answer is known: silence then a note, a note that fades, a steady note at a set detune, and a note under noise at a set SNR. A small scorer reads idea 2's hop log and prints a few numbers per scene: share of hops within 5 cents, worst cents error after settling, hops from onset to first found, and false finds in silence. The owner gets the analytics as a table they can diff between builds, instead of watching the strobe.</dd>
+<dt>Axis</dt>
+<dd>Test signals</dd>
+<dt>Basis</dt>
+<dd><ul>
+<li><code>direct:</code> the evidence scan: "No fixture starts from silence and then produces a tone" and "no envelope, attack, decay, or onset". Headers already carry static truth keys, <code>expect_hz</code> and <code>expect_cents</code>.</li>
+<li><code>direct:</code> <code>Tolerance.swift</code> skips the first 20 hops of every fixture as warm-up, so onset behaviour is never checked today.</li>
+<li><code>direct:</code> plan:198 sets a latency target ("about 23 ms") and plan:177 says "Silence is never mistaken for a quiet room". Neither is measured automatically.</li>
+<li><code>external:</code> mir_eval's raw pitch accuracy and aubio's sine-plus-silence tests.</li>
+</ul></dd>
+<dt>Rationale</dt>
+<dd>The goldens prove the new engine matches the old one. They can't say whether either is right on a plucked note. They also stop applying once stage 2 changes sample rates. A scorecard based on known answers keeps working across engine changes.</dd>
+<dt>Downsides</dt>
+<dd>Keep it small. Per-commit trend dashboards and a second pitch detector as referee are more than a one-person project will read. Glides and vibrato have no clean per-hop answer, because the engine measures over a 16384-sample window, so leave them out.</dd>
+<dt>Confidence</dt><dd>65%</dd>
+<dt>Complexity</dt><dd>Medium</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-6">
+<div class="eyebrow">Idea 6</div>
+<h3>6. Pick the input device by UID, for a silent manual check through BlackHole</h3>
+<div class="chips"><span class="chip id">Rank 6</span><span class="chip">Axis: Where and when checks run</span><span class="chip">Confidence 60%</span><span class="chip">Complexity Low</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>Add <code>device:&lt;uid&gt;</code> as a third value of idea 1's setting. Capture translates the UID to a device and binds to it instead of the default. At startup it logs one line: "capturing from &lt;name&gt; &lt;uid&gt; @ &lt;rate&gt;". With BlackHole 2ch installed, a small player writes test tones to BlackHole's output and the tuner reads BlackHole's input. The real CoreAudio capture path runs with nothing audible and the owner's default devices left alone. This is a manual check the owner starts. It is not part of <code>make test</code>.</dd>
+<dt>Axis</dt>
+<dd>Where and when checks run</dd>
+<dt>Basis</dt>
+<dd><ul>
+<li><code>direct:</code> <code>CaptureHAL.m:192-202</code> <code>// Get the default input device</code> … <code>return kCaptureStatusNoInputDevice;</code>. No UID or device-list code exists in either tree.</li>
+<li><code>direct:</code> memory note: "the first run with AirPods connected played the tone into the AirPods and captured from their mic, so nothing registered".</li>
+<li><code>external:</code> TN2091 (UID to device, then <code>kAudioOutputUnitProperty_CurrentDevice</code>). BlackHole is GPL-3, the same licence family as this repo.</li>
+</ul></dd>
+<dt>Rationale</dt>
+<dd>Ideas 1–5 never touch <code>CaptureHAL.m</code>. This is the cheapest way to check that path without speakers or a quiet room. The startup line also makes a wrong-device run obvious, which would have caught the AirPods failure straight away.</dd>
+<dt>Downsides</dt>
+<dd><code>afplay</code> can't choose an output device, so the player has to be <code>sox</code>, <code>ffmpeg</code> or a few lines of Swift. The mic permission grant probably still applies. Not for CI: hosted macOS runners sometimes have no audio device. Stage 2 replaces the HAL code, so the UID lookup has to be redone there.</dd>
+<dt>Confidence</dt><dd>60%</dd>
+<dt>Complexity</dt><dd>Low</dd>
+</dl>
+</article>
+
+<section class="callout warn">
+<div class="eyebrow">Works today with no code</div>
+<p>Install BlackHole and set it as both the default input and the default output. Then play tones with <code>afplay</code> and start Tuner. The laptop stays silent. The catch: every system sound and call goes into BlackHole too, and the defaults have to be put back afterwards. Idea 6 removes that catch.</p>
+</section>
+</section>
+
+<section id="rejection-summary">
+<h2>Rejection Summary</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>#</th><th>Idea</th><th>Reason Rejected</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Corpus of pitched distractors (cry, speech, kettle) expected to read "not found"</td><td>Wrong expected result: the tuner can't tell voices from instruments, so these would fail by design. Kept inside idea 4 as a measurement.</td></tr>
+<tr><td>2</td><td>Fake CoreAudio by defining the HAL functions in a test binary</td><td>Defining 12 CoreAudio functions in the test bundle would replace them for every other test. It only checks the code against its own idea of the HAL, and the status strings are already tested.</td></tr>
+<tr><td>3</td><td>Capture event suite (rate change, device lost, permission) plus transport chaos</td><td>Stage 1 has no capture events, only a polled status, and the controller is stage 2 work. Random push sizes, drops and stalls are already covered by <code>RingTests.swift</code>.</td></tr>
+<tr><td>4</td><td>Test the stage 2 AVAudioEngine capture in offline rendering mode</td><td>That capture code isn't built yet, and a sink on the input node probably needs a live device. Revisit as a spike when stage 2 starts.</td></tr>
+<tr><td>5</td><td>Unattended lab on a spare Mac or macOS VM, with a stable signing identity</td><td>Needs a spare machine or TCC tampering, a driver and signing, which STRATEGY.md rules out for now. Ideas 1–2 give the same headless coverage without it.</td></tr>
+<tr><td>6</td><td><code>make measure</code> over controlled input for CPU and latency</td><td>File input skips the HAL callback cost, so the numbers wouldn't compare with the 13.3% and 7.4% figures measured with the mic open. The owner runs measurements themselves.</td></tr>
+<tr><td>7</td><td>Linux app on a PulseAudio null sink in CI</td><td>STRATEGY.md: no work on the Linux port. It also tests a separate DSP copy.</td></tr>
+<tr><td>8</td><td>Run every clip through the frozen old engine and the new core and diff them, with approved logs per PR</td><td>The frozen engine's results flip on threshold cases and it has known undefined behaviour, so it can't judge real clips. It is due to be retired after stage 1.</td></tr>
+<tr><td>9</td><td>Timeline of settings changes inside fixture headers</td><td>Tests settings changes, not audio input. Small enough to add when needed.</td></tr>
+<tr><td>10</td><td>Render the views offscreen and compare against golden PNGs</td><td>Outside the input-and-analytics scope. The images would be thrown away when stage 2 moves to SwiftUI, and they drift across macOS versions.</td></tr>
+<tr><td>11</td><td>Custom libASPL virtual microphone that generates tones inside coreaudiod</td><td>A new HAL plug-in to build and install, and it still needs the mic grant. Idea 6 with BlackHole gets the same result.</td></tr>
+<tr><td>12</td><td>Nightly randomised sweep across pitch, level and rate</td><td>Seeded random pushes already run in <code>make test</code>. A nightly report would go unread on a one-person project.</td></tr>
+<tr><td>13</td><td>Tone leader on every recording, as its own idea</td><td>Too small on its own. Folded into idea 3.</td></tr>
+<tr><td>14</td><td>BlackHole as system default with the unchanged app</td><td>Works now, but takes over call audio and needs the defaults reset afterwards. Kept as the "works today" note under idea 6.</td></tr>
+<tr><td>15</td><td>Recorder plus noise beds plus old-vs-new engine diff, as one combination</td><td>Depends on the rejected engine diff (row 8) and puts household audio in a GPL repo. Ideas 3 and 4 keep the useful parts.</td></tr>
+<tr><td>16</td><td>"Headless bench" combination of input source, hop log and scorecard</td><td>Not cut: ideas 1, 2 and 5 are its parts, ranked separately so each can ship on its own.</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<footer class="composition-signal">Composed <time datetime="2026-10-17">2026-10-17</time> by ce-ideate from the user's prompt about testing the tuner's audio input headlessly, grounded in <code>origin/master</code> at <code>16fd1d2</code>.</footer>
+</main>
+</body>
+</html>
