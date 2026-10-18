@@ -35,6 +35,9 @@ let package = Package(
         // Named Tuner so the linker signs the binary with today's
         // identifier, which the microphone grant is tied to
         .executable(name: "Tuner", targets: ["TunerAppKit"]),
+        // Stage 2: the SwiftUI window. Until the stage 1 app goes, it
+        // is bundled and signed as Tuner by Scripts/package-app.sh
+        .executable(name: "TunerApp", targets: ["TunerApp"]),
     ],
     targets: [
         // The analysis engine: plain C on Accelerate, no Cocoa
@@ -93,6 +96,15 @@ let package = Package(
                 "main.swift",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
+
+        // Stage 2: the SwiftUI window on the same state layer
+        .executableTarget(
+            name: "TunerApp",
+            dependencies: ["TunerState"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .defaultIsolation(MainActor.self),
+            ]),
 
         // Prints the tuner's readings for a tone or a file and can pass
         // or fail them against a target note

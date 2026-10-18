@@ -23,7 +23,7 @@ BIN = .build/release
 # The app is bundled from this executable product with these resource
 # bundles, into .build/Tuner.app, which git ignores with the rest of
 # .build
-APPPRODUCT = Tuner
+APPPRODUCT = TunerApp
 APPBUNDLES =
 APPDIR = .build
 
