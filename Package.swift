@@ -57,6 +57,14 @@ let package = Package(
             name: "TunerState",
             dependencies: ["TunerCore", "TunerCapture"]),
 
+        // Sound sources for the tuner: tones and files, the headless
+        // run and its verdict. Not a product; the executables and, later,
+        // the app link it.
+        .target(
+            name: "TunerSource",
+            dependencies: ["TunerState"],
+            linkerSettings: [.linkedFramework("AVFAudio")]),
+
         // Stage 1: today's AppKit window on the new core. swift/Makefile
         // copies this binary into Tuner.app.
         .executableTarget(
@@ -107,5 +115,9 @@ let package = Package(
         .testTarget(
             name: "TunerStateTests",
             dependencies: ["TunerState"]),
+
+        .testTarget(
+            name: "TunerSourceTests",
+            dependencies: ["TunerSource", "TunerState"]),
     ]
 )
