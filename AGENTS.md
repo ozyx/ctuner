@@ -28,6 +28,8 @@ make core-leaks             # the engine's start/stop/destroy lifecycle 100 time
 make build                  # release build of every product, the app's Tuner product included
 make fixtures               # rewrite the golden fixtures from the frozen engine
 make fixture-screen         # check every fixture holds across builds and sanitizers
+make tone-checks            # tuner-run over known tones, each row asserting its exit code (CI runs it)
+.build/release/tuner-run tone:A4+7 --target A4+7   # headless reading of a tone or file:PATH; exit 0 pass, 1 fail, 2 usage
 
 # macOS (Swift app) — swift build -c release --product Tuner at the
 # repo root, then bundles that binary as Tuner.app

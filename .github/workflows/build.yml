@@ -32,6 +32,8 @@ jobs:
         uses: "actions/checkout@v4"
       - name: Test package
         run: make test
+      - name: Check tones
+        run: make tone-checks
       - name: Build tools
         run: |
           cd swift
