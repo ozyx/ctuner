@@ -16,8 +16,8 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //  The tuner's pane layout and the placeholder panes that carry their
-//  clicks (R17) until the real ones arrive: U16 replaces the strobe
-//  and U17 the scope and spectrum.
+//  clicks (R17) until the real ones arrive: U17 replaces the scope and
+//  spectrum.
 
 import SwiftUI
 import TunerState
@@ -57,13 +57,10 @@ struct TunerPanes: View
 
             if model.settings.strobe
             {
-                PlaceholderPane(help: "Strobe - click for staff",
-                                action: model.toggleStrobe)
-                {
-                    Text("Strobe")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(minHeight: 80)
+                StrobeLayerView()
+                    .clickable(help: "Strobe - click for staff",
+                               action: model.toggleStrobe)
+                    .frame(minHeight: 80)
             }
 
             else
