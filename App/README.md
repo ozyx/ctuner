@@ -54,3 +54,23 @@ are also in the View menu.
  * Click on meter to lock
  * Click on strobe to switch to the staff
  * Click on staff to switch to the strobe
+
+### Playing a file or a tone instead of the microphone
+Launch with `-InputSource` to hear nothing and still watch the tuner move:
+
+```sh
+open -n .build/Tuner.app --args -InputSource tone:E4+5
+open -n .build/Tuner.app --args -InputSource file:/Users/me/take.wav
+```
+
+ * `tone:` takes a note such as `A4` or `Eb4+7` (cents) or a frequency in
+   Hz, with optional `,rate=`, `,amp=` and `,secs=` parts. A tone never
+   ends in the window.
+ * `file:` takes a WAV file, uses its first channel at its own sample rate, and loops it. Use an absolute path,
+   because an app started by `open` runs with `/` as its working
+   directory.
+ * Quit the running app first, or use `open -n`: `open --args` passes
+   nothing to an instance that is already running.
+ * The flag is read once and never saved, so the next launch from Finder
+   uses the microphone. A bad value or an unreadable file shows in the
+   window as a capture failure.
