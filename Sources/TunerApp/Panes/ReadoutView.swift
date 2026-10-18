@@ -67,6 +67,11 @@ struct ReadoutView: View
                 }
             }
         }
+        .onChange(of: model.display.readoutTick)
+        {
+            _, tick in
+            Signposts.readout(tick)
+        }
     }
 }
 

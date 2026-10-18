@@ -42,7 +42,7 @@ COREOBJECTS = $(patsubst $(CORE)/%.c,$(COREBUILD)/%.o,$(CORESOURCES))
 CORECFLAGS = -O2 -Wall -Wextra -Werror -I$(CORE)/include
 FORBIDDEN = '_objc_|_OBJC_|_NS|_CF|_os_log|_syslog|_asl_|printf|_puts|_fputs|_putchar|_fwrite|_perror'
 
-.PHONY: build app dmg test test-release sanitize core-check core-leaks fixtures fixture-screen tone-checks clean
+.PHONY: build app dmg measure test test-release sanitize core-check core-leaks fixtures fixture-screen tone-checks clean
 
 build:
 	$(SWIFT) build -c release
@@ -60,6 +60,19 @@ dmg: app
 	hdiutil create -volname Tuner -srcfolder $(DMGSTAGE) -fs HFS+ \
 		-format UDZO -ov $(DMG)
 	rm -rf $(DMGSTAGE)
+
+# Print the measurement recipes; Scripts/measure.sh runs each one against
+# a Tuner you have launched
+measure:
+	@echo "Launch .build/Tuner.app, then:"
+	@echo "  Scripts/measure.sh cpu       AE3: silence, inspector hidden, mean under 5%"
+	@echo "                               (again with the inspector shown; record both)"
+	@echo "  Scripts/measure.sh wakeups   R34: window hidden, idle wake-ups under 1 a second"
+	@echo "  Scripts/measure.sh main      no analysis function on the main thread"
+	@echo "  Scripts/measure.sh latency   hop publish to readout update, while a note plays"
+	@echo "  Scripts/measure.sh allocs    R22: relaunch with MallocStackLoggingNoCompact=1;"
+	@echo "                               idle and with a note playing should match"
+	@echo "Also by hand: the microphone indicator goes off after the pause debounce."
 
 test:
 	$(SWIFT) test $(TESTINGPLUGIN)

@@ -28,6 +28,7 @@ make core-leaks             # the engine's start/stop/destroy lifecycle 100 time
 make build                  # release build of every product, the app's TunerApp product included
 make app                    # bundle the release TunerApp (SwiftUI) product as .build/Tuner.app, ad hoc signed as Tuner
 make dmg                    # .build/Tuner-<version>.dmg: the app, an Applications link and App/README.md (version read from App/Info.plist)
+make measure                # print the performance recipes; Scripts/measure.sh runs each against a Tuner you launched (cpu, wakeups, allocs, main, latency)
 make fixtures               # rewrite the golden fixtures from the frozen engine
 make fixture-screen         # check every fixture holds across builds and sanitizers
 make tone-checks            # tuner-run over known tones, each row asserting its exit code (CI runs it)

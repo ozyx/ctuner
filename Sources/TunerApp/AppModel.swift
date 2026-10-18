@@ -57,11 +57,18 @@ final class AppModel
             // keep nothing of its buffers beyond this turn
             let display = display
             let traces = traces
+            var signalled = 0
             controller.onSnapshot =
             {
                 if display.traceRefresh
                 {
                     traces.refresh($0)
+                }
+
+                if display.readoutTick != signalled
+                {
+                    signalled = display.readoutTick
+                    Signposts.hop(signalled)
                 }
             }
 
