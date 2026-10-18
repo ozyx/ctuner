@@ -20,6 +20,13 @@ TESTINGPLUGIN = $(if $(filter $(CLT),$(shell xcode-select -p 2>/dev/null)),\
 FIXTURES = Tests/TunerCoreTests/Fixtures
 BIN = .build/release
 
+# The app is bundled from this executable product with these resource
+# bundles, into .build/Tuner.app, which git ignores with the rest of
+# .build
+APPPRODUCT = Tuner
+APPBUNDLES =
+APPDIR = .build
+
 # The core compiled on its own with every warning an error, and the
 # symbols it would need from Cocoa, the Objective-C runtime or a logger
 CORE = Sources/TunerCore
@@ -29,10 +36,14 @@ COREOBJECTS = $(patsubst $(CORE)/%.c,$(COREBUILD)/%.o,$(CORESOURCES))
 CORECFLAGS = -O2 -Wall -Wextra -Werror -I$(CORE)/include
 FORBIDDEN = '_objc_|_OBJC_|_NS|_CF|_os_log|_syslog|_asl_|printf|_puts|_fputs|_putchar|_fwrite|_perror'
 
-.PHONY: build test test-release sanitize core-check core-leaks fixtures fixture-screen tone-checks clean
+.PHONY: build app test test-release sanitize core-check core-leaks fixtures fixture-screen tone-checks clean
 
 build:
 	$(SWIFT) build -c release
+
+app:
+	$(SWIFT) build -c release --product $(APPPRODUCT)
+	Scripts/package-app.sh $(BIN)/$(APPPRODUCT) $(APPDIR) $(APPBUNDLES)
 
 test:
 	$(SWIFT) test $(TESTINGPLUGIN)
