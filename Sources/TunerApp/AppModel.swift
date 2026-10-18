@@ -30,9 +30,6 @@ final class AppModel
     let settings = Settings()
     let display = DisplayModel()
 
-    // The spectrum expands in powers of two from x1 to x16
-    private static let expandRange = 1 ... 16
-
     // toggleLock
     func toggleLock()
     {
@@ -43,29 +40,6 @@ final class AppModel
     func toggleStrobe()
     {
         settings.strobe.toggle()
-    }
-
-    // cycleColour: the next strobe colours, then back to the first
-    func cycleColour()
-    {
-        settings.colour = (settings.colour + 1)
-          % (TunerState.Settings.colourRange.upperBound + 1)
-    }
-
-    // expand: x1 to x16, then back to x1
-    func expand()
-    {
-        let next = settings.expand * 2
-        settings.expand = (next > Self.expandRange.upperBound)
-          ? Self.expandRange.lowerBound : next
-    }
-
-    // contract: x16 to x1, then back to x16
-    func contract()
-    {
-        let next = settings.expand / 2
-        settings.expand = (next < Self.expandRange.lowerBound)
-          ? Self.expandRange.upperBound : next
     }
 
     // copyReadout: the readout line to the pasteboard; nothing in blank

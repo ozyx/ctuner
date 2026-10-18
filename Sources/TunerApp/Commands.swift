@@ -85,16 +85,16 @@ struct TunerCommands: Commands
                 .keyboardShortcut("c", modifiers: [])
             Toggle("Lock Display", isOn: $display.isLocked)
                 .keyboardShortcut("l", modifiers: [])
-            Button("Change Strobe Colours") { model.cycleColour() }
+            Button("Change Strobe Colours") { settings.cycleColour() }
                 .keyboardShortcut("k", modifiers: [])
 
             Divider()
 
             Toggle("Zoom Spectrum", isOn: $settings.zoom)
                 .keyboardShortcut("z", modifiers: [])
-            Button("Expand Spectrum") { model.expand() }
+            Button("Expand Spectrum") { settings.expandSpectrum() }
                 .keyboardShortcut("+", modifiers: [])
-            Button("Contract Spectrum") { model.contract() }
+            Button("Contract Spectrum") { settings.contractSpectrum() }
                 .keyboardShortcut("-", modifiers: [])
         }
     }

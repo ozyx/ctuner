@@ -75,7 +75,7 @@ struct GeneralSettings: View
                     Text("Hz")
                     Stepper("Reference frequency",
                             value: $settings.reference,
-                            in: Settings.referenceRange,
+                            in: TunerState.Settings.referenceRange,
                             step: 1)
                         .labelsHidden()
                 }
@@ -128,8 +128,9 @@ struct GeneralSettings: View
     // the stored one either way (R33)
     private func commit()
     {
-        if let value = Double(text.trimmingCharacters(in: .whitespaces)),
-           Settings.referenceRange.contains(value)
+        if let value = try? Double(text.trimmingCharacters(in: .whitespaces),
+                                   format: .number),
+           TunerState.Settings.referenceRange.contains(value)
         {
             model.settings.reference = value
         }

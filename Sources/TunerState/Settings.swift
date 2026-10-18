@@ -43,6 +43,9 @@ public final class Settings
       0 ... Notes.translate.count - 1
     public nonisolated static let colourRange = 0 ... 2
 
+    // The spectrum expands in powers of two
+    public nonisolated static let expandRange = 1 ... 16
+
     // The note filter's two independent sets, as wide as the core's masks
     public nonisolated static let noteCount = Int(kTunerNotes)
     public nonisolated static let octaveCount = Int(kTunerOctaves)
@@ -319,6 +322,28 @@ public final class Settings
                                  Settings.octaveCount)
         expand = Settings.read(defaults, Key.expand, nil, 1)
         inspector = Settings.read(defaults, Key.inspector, nil, false)
+    }
+
+    // cycleColour: the next strobe colours, then back to the first
+    public func cycleColour()
+    {
+        colour = (colour + 1) % (Settings.colourRange.upperBound + 1)
+    }
+
+    // expandSpectrum: x1 to x16, then back to x1
+    public func expandSpectrum()
+    {
+        let next = expand * 2
+        expand = (next > Settings.expandRange.upperBound)
+          ? Settings.expandRange.lowerBound : next
+    }
+
+    // contractSpectrum: x16 to x1, then back to x16
+    public func contractSpectrum()
+    {
+        let next = expand / 2
+        expand = (next < Settings.expandRange.lowerBound)
+          ? Settings.expandRange.upperBound : next
     }
 
     // apply: every engine setting to the attached engine
