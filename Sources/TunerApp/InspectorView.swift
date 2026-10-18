@@ -15,9 +15,7 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  The inspector (R10): the scope, the spectrum and the note filter,
-//  the scope and the spectrum placeholders until U17 fills them,
-//  carrying their clicks, and the note filter.
+//  The inspector (R10): the scope, the spectrum and the note filter.
 
 import SwiftUI
 
@@ -29,19 +27,17 @@ struct InspectorView: View
     {
         VStack(spacing: 8)
         {
-            PlaceholderPane(help: "Scope - click to filter audio",
-                            action: { model.settings.filter.toggle() })
-            {
-                Text("Scope")
-                    .foregroundStyle(.secondary)
-            }
+            ScopeView()
+                .clipShape(.rect(cornerRadius: 8))
+                .clickable(help: "Scope - click to filter audio",
+                           action: { model.settings.filter.toggle() })
+                .frame(minHeight: 80)
 
-            PlaceholderPane(help: "Spectrum - click to zoom",
-                            action: { model.settings.zoom.toggle() })
-            {
-                Text("Spectrum")
-                    .foregroundStyle(.secondary)
-            }
+            SpectrumView()
+                .clipShape(.rect(cornerRadius: 8))
+                .clickable(help: "Spectrum - click to zoom",
+                           action: { model.settings.zoom.toggle() })
+                .frame(minHeight: 80)
 
             NoteFilterView()
         }
