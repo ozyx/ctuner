@@ -100,6 +100,12 @@ public struct CaptureError: Error, Sendable
     {
         message = String(cString: CaptureStatusString(status))
     }
+
+    // init(message:)
+    public init(message: String)
+    {
+        self.message = message
+    }
 }
 
 // The audio side of the controller
