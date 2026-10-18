@@ -149,6 +149,31 @@ struct FeederTests
         feeder.stop()
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func aDroppedFeederStopsItsThread() async throws
+    {
+        let counter = Counter(limit: nil)
+        do
+        {
+            let feeder = Feeder(rate: kFastRate, fill: counter.fill,
+                                push: counter.push)
+            feeder.start()
+            while counter.count < 5
+            {
+                try await Task.sleep(for: .milliseconds(1))
+            }
+
+            // A use after the loop keeps the feeder from being released
+            // early
+            #expect(!feeder.finished)
+        }
+
+        // The deinit joined the thread, so nothing more arrives
+        let stopped = counter.count
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(counter.count == stopped)
+    }
+
     @Test func keepsTimeAgainstTheClock() async throws
     {
         // 50 blocks at 2 ms each take about 100 ms, not 100 ms plus the

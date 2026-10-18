@@ -20,12 +20,89 @@
 //  errors do not accumulate. stop returns only once the thread has
 //  exited, so nothing pushes after it. The source behind fill keeps its
 //  own playhead, so a stop and a start resume where the sound left off.
+//  The thread holds the work, not the feeder, so a feeder that is
+//  dropped without a stop still stops in its deinit.
 
 import Foundation
 import TunerState
 
 public final class Feeder: @unchecked Sendable
 {
+    // What the thread holds: the blocks' source and sink and the state
+    // they share with the feeder
+    private final class Work: @unchecked Sendable
+    {
+        let interval: Double
+        let fill: (UnsafeMutableBufferPointer<Float>) -> Bool
+        let push: (UnsafeBufferPointer<Float>) -> Void
+
+        // The one buffer every block goes through
+        let buffer: UnsafeMutableBufferPointer<Float>
+
+        let lock = NSLock()
+        var run: Run?
+        var ended = false
+
+        // init
+        init(interval: Double,
+             fill: @escaping (UnsafeMutableBufferPointer<Float>) -> Bool,
+             push: @escaping (UnsafeBufferPointer<Float>) -> Void)
+        {
+            self.interval = interval
+            self.fill = fill
+            self.push = push
+            buffer = .allocate(capacity: Engine.blockSize)
+            buffer.initialize(repeating: 0)
+        }
+
+        deinit
+        {
+            buffer.deallocate()
+        }
+
+        // cancelled
+        func cancelled(_ run: Run) -> Bool
+        {
+            lock.lock()
+            defer { lock.unlock() }
+            return run.cancelled
+        }
+
+        // feed: the thread body
+        func feed(_ run: Run)
+        {
+            defer { run.exited.signal() }
+
+            let start = ProcessInfo.processInfo.systemUptime
+            var count = 0
+
+            while !cancelled(run)
+            {
+                let deadline = start + Double(count) * interval
+                let wait = deadline - ProcessInfo.processInfo.systemUptime
+                if wait > 0
+                {
+                    Thread.sleep(forTimeInterval: wait)
+                    if cancelled(run)
+                    {
+                        break
+                    }
+                }
+
+                guard fill(buffer) else
+                {
+                    lock.lock()
+                    ended = true
+                    lock.unlock()
+                    break
+                }
+
+                push(UnsafeBufferPointer(buffer))
+                count += 1
+            }
+        }
+    }
+
     // One run of the thread
     private final class Run: @unchecked Sendable
     {
@@ -33,16 +110,7 @@ public final class Feeder: @unchecked Sendable
         let exited = DispatchSemaphore(value: 0)
     }
 
-    private let interval: Double
-    private let fill: (UnsafeMutableBufferPointer<Float>) -> Bool
-    private let push: (UnsafeBufferPointer<Float>) -> Void
-
-    // The one buffer every block goes through
-    private let buffer: UnsafeMutableBufferPointer<Float>
-
-    private let lock = NSLock()
-    private var run: Run?
-    private var ended = false
+    private let work: Work
 
     // init: fill writes the next block and returns false at the end of
     // the sound; push takes each block
@@ -50,41 +118,38 @@ public final class Feeder: @unchecked Sendable
                 fill: @escaping (UnsafeMutableBufferPointer<Float>) -> Bool,
                 push: @escaping (UnsafeBufferPointer<Float>) -> Void)
     {
-        interval = Double(Engine.blockSize) / rate
-        self.fill = fill
-        self.push = push
-        buffer = .allocate(capacity: Engine.blockSize)
-        buffer.initialize(repeating: 0)
+        work = Work(interval: Double(Engine.blockSize) / rate,
+                    fill: fill, push: push)
     }
 
     deinit
     {
         stop()
-        buffer.deallocate()
     }
 
     // finished: the sound ended; a stop alone does not set it
     public var finished: Bool
     {
-        lock.lock()
-        defer { lock.unlock() }
-        return ended
+        work.lock.lock()
+        defer { work.lock.unlock() }
+        return work.ended
     }
 
     // start: no effect while running or after the end
     public func start()
     {
-        lock.lock()
-        defer { lock.unlock() }
-        guard run == nil, !ended else
+        work.lock.lock()
+        defer { work.lock.unlock() }
+        guard work.run == nil, !work.ended else
         {
             return
         }
 
         let run = Run()
-        self.run = run
+        work.run = run
 
-        let thread = Thread { [self] in feed(run) }
+        let work = self.work
+        let thread = Thread { work.feed(run) }
         thread.name = "Feeder"
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -93,21 +158,21 @@ public final class Feeder: @unchecked Sendable
     // stop: returns once the thread has exited
     public func stop()
     {
-        lock.lock()
-        let run = self.run
+        work.lock.lock()
+        let run = work.run
         run?.cancelled = true
-        lock.unlock()
+        work.lock.unlock()
 
         // Signalled again so that a second stop does not wait forever
         run?.exited.wait()
         run?.exited.signal()
 
-        lock.lock()
-        if self.run === run
+        work.lock.lock()
+        if work.run === run
         {
-            self.run = nil
+            work.run = nil
         }
-        lock.unlock()
+        work.lock.unlock()
     }
 
     // wait: until the sound ends or the feeder is stopped
@@ -115,57 +180,16 @@ public final class Feeder: @unchecked Sendable
     {
         while true
         {
-            lock.lock()
-            let running = (run.map { !$0.cancelled } ?? false) && !ended
-            lock.unlock()
+            work.lock.lock()
+            let running = (work.run.map { !$0.cancelled } ?? false)
+              && !work.ended
+            work.lock.unlock()
 
             if !running
             {
                 return
             }
-            Thread.sleep(forTimeInterval: interval)
-        }
-    }
-
-    // cancelled
-    private func cancelled(_ run: Run) -> Bool
-    {
-        lock.lock()
-        defer { lock.unlock() }
-        return run.cancelled
-    }
-
-    // feed: the thread body
-    private func feed(_ run: Run)
-    {
-        defer { run.exited.signal() }
-
-        let start = ProcessInfo.processInfo.systemUptime
-        var count = 0
-
-        while !cancelled(run)
-        {
-            let deadline = start + Double(count) * interval
-            let wait = deadline - ProcessInfo.processInfo.systemUptime
-            if wait > 0
-            {
-                Thread.sleep(forTimeInterval: wait)
-                if cancelled(run)
-                {
-                    break
-                }
-            }
-
-            guard fill(buffer) else
-            {
-                lock.lock()
-                ended = true
-                lock.unlock()
-                break
-            }
-
-            push(UnsafeBufferPointer(buffer))
-            count += 1
+            Thread.sleep(forTimeInterval: work.interval)
         }
     }
 }
