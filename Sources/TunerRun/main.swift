@@ -93,6 +93,18 @@ guard let target = options.target else
     exit(0)
 }
 
+// A paced run that dropped hops read only part of the sound, and a pass
+// on what survived would vouch for the rest
+if let blocks = stream.blockCount, options.paced,
+   result.overruns > 0 || result.hops.count < blocks
+{
+    FileHandle.standardError.write(Data(
+      ("error: the paced run dropped hops (\(result.hops.count) of "
+       + "\(blocks) read, \(result.overruns) overruns), so there is "
+       + "nothing to judge\n").utf8))
+    exit(2)
+}
+
 let verdict = Verdict.judge(result.hops, against: target)
 FileHandle.standardError.write(Data((verdict.summary + "\n").utf8))
 exit(verdict.exitCode)

@@ -124,8 +124,8 @@ public struct RunOptions: Equatable, Sendable
             case "--downsample": options.settings.downsample = true
             case "--fundamental": options.settings.fundamental = true
             case "--note-filter": options.settings.noteFilter = true
-            case "--notes": options.settings.notes = try mask(12)
-            case "--octaves": options.settings.octaves = try mask(9)
+            case "--notes": options.settings.notes = try mask(Settings.noteCount)
+            case "--octaves": options.settings.octaves = try mask(Settings.octaveCount)
 
             case "--target":
                 let text = try value()

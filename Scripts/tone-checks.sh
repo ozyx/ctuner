@@ -47,7 +47,16 @@ check()
     local verdict
     verdict=$("$RUN" "$@" --quiet 2>&1) || code=$?
 
-    if [ "$code" -eq "$expected" ]
+    # The verdict line says which kind of exit this was, so a run with no
+    # target (exit 0, no verdict) or a source error that happens to exit
+    # 1 cannot stand in for a pass or a fail
+    local prefix=none
+    case $expected in
+        0) prefix="pass:" ;;
+        1) prefix="fail:" ;;
+    esac
+
+    if [ "$code" -eq "$expected" ] && [ "${verdict#"$prefix"}" != "$verdict" ]
     then
         printf 'ok   %-34s exit %s: %s\n' "$name" "$code" "$verdict"
     else

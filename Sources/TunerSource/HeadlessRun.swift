@@ -27,6 +27,10 @@ import TunerState
 // never builds a Settings, which would read and write a defaults domain.
 public struct RunSettings: Equatable, Sendable
 {
+    // Every note and every octave, the widths Settings uses
+    static let allNotes = UInt32((1 << Settings.noteCount) - 1)
+    static let allOctaves = UInt32((1 << Settings.octaveCount) - 1)
+
     public var reference = Notes.reference
     public var temperament = Temperaments.equal
     public var key = 0
@@ -34,8 +38,8 @@ public struct RunSettings: Equatable, Sendable
     public var downsample = false
     public var fundamental = false
     public var noteFilter = false
-    public var notes: UInt32 = (1 << 12) - 1
-    public var octaves: UInt32 = (1 << 9) - 1
+    public var notes: UInt32 = RunSettings.allNotes
+    public var octaves: UInt32 = RunSettings.allOctaves
 
     // init
     public init() {}
@@ -51,8 +55,8 @@ public struct RunSettings: Equatable, Sendable
         engine.setDownsample(downsample)
         engine.setFundamental(fundamental)
         engine.setNoteFilter(noteFilter)
-        engine.setNoteMask(notes == 0 ? (1 << 12) - 1 : notes)
-        engine.setOctaveMask(octaves == 0 ? (1 << 9) - 1 : octaves)
+        engine.setNoteMask(notes == 0 ? RunSettings.allNotes : notes)
+        engine.setOctaveMask(octaves == 0 ? RunSettings.allOctaves : octaves)
     }
 }
 

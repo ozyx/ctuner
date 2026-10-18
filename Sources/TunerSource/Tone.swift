@@ -51,6 +51,9 @@ public struct Tone: Sendable
             * pow(2.0, cents / 1200.0)
     }
 
+    // The most samples a finite tone may hold, about a day at 96 kHz
+    static let maxSamples = 1e10
+
     public let frequency: Double
     public let rate: Double
     public let amplitude: Double
@@ -84,7 +87,14 @@ public struct Tone: Sendable
 
         rate = spec.rate
         amplitude = spec.amplitude
-        count = spec.seconds.map { Int(($0 * spec.rate).rounded()) }
+        // A length no run could play is an error, not an overflow trap
+        let samples = spec.seconds.map { ($0 * spec.rate).rounded() }
+        if let samples, !(samples < Tone.maxSamples)
+        {
+            throw SourceError("a tone of \(spec.seconds ?? 0) s at "
+                              + "\(spec.rate) Hz is too long")
+        }
+        count = samples.map { Int($0) }
     }
 
     // fill: samples from the absolute index start, in double precision

@@ -55,6 +55,7 @@ Package targets, dependencies pointing one way (app to state to core and capture
 
 - `TunerCore` (C on Accelerate, no Cocoa, no globals): the analysis engine behind an opaque handle. It owns its analysis thread; capture pushes samples into a wait-free ring (`TunerEnginePush`), and each hop is published to a triple buffer that one consumer reads with `TunerEngineAcquire`. Settings are atomics set through `TunerEngineSet...`.
 - `TunerCapture` (Objective-C): the AUHAL input unit behind `CaptureCreate`/`CaptureStart`/`CaptureStop`/`CaptureDestroy`. Create does all the setup, so `CaptureSampleRate` is known before the engine is made; the input callback only renders and calls the push function it was given.
+- `TunerSource` (Swift, links AVFAudio, not a product): `file:`/`tone:` source descriptions, tone synthesis, the WAV reader, the real-time feeder, the headless run and its pass/fail verdict. The `tuner-run` executable (`TunerRun`) is its command line.
 - `TunerState` (Swift, no AppKit): `Engine` (wraps the handle; `start(onHop:)` runs its callback on the analysis thread; `acquire()` returns a `Snapshot` whose scope and spectrum buffers are valid only until the next acquire), `DisplayModel` (the blank/live/stale/locked state machine: readout cadence, 1.5 s stale, lock, meter smoothing, the every-16th-hop trace refresh, the copy line, the staff note), `Settings` (every setting, written to `UserDefaults` as it changes and forwarded to an attached engine; reads today's nine legacy keys on first launch), `Notes`, `Temperaments`.
 
 The window (`swift/`):

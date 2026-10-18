@@ -110,6 +110,16 @@ struct ToneTests
         }
     }
 
+    // A length no run could play is an error, not a trap
+    @Test(arguments: ["tone:A4,secs=1e30", "tone:A4,rate=1e300,secs=10"])
+    func absurdLengthIsAnError(_ description: String) throws
+    {
+        #expect(throws: SourceError.self)
+        {
+            try resolve(description)
+        }
+    }
+
     @Test func unknownTemperamentIsAnError() throws
     {
         #expect(throws: SourceError.self)
