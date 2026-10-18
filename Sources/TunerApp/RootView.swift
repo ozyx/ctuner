@@ -18,8 +18,48 @@
 //  The window's content: the main area, the inspector on the trailing
 //  side and the toolbar.
 
+import AppKit
 import SwiftUI
 import TunerState
+
+// Reports the hosting window to the model once it exists
+struct WindowReader: NSViewRepresentable
+{
+    let report: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView
+    {
+        return ReportingView(report: report)
+    }
+
+    func updateNSView(_ view: NSView, context: Context)
+    {
+    }
+
+    private final class ReportingView: NSView
+    {
+        let report: (NSWindow) -> Void
+
+        init(report: @escaping (NSWindow) -> Void)
+        {
+            self.report = report
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder)
+        {
+            return nil
+        }
+
+        override func viewDidMoveToWindow()
+        {
+            if let window
+            {
+                report(window)
+            }
+        }
+    }
+}
 
 struct RootView: View
 {
@@ -34,6 +74,7 @@ struct RootView: View
             // area, eight reed rows, the meter and a strobe tall
             // enough to read; U11 confirms it against the real rows
             .frame(minWidth: 560, minHeight: 360)
+            .background(WindowReader(report: model.attach))
             .inspector(isPresented: $settings.inspector)
             {
                 InspectorView()
