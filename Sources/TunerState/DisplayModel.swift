@@ -108,6 +108,11 @@ public final class DisplayModel
     // The meter shows in tune within this many cents, inclusive
     public nonisolated static let inTuneCents = 5.0
 
+    // The strobe cents move only by at least this many cents, the change
+    // that alters the layer animation's speed by StrobeMotion's minimum
+    public nonisolated static let strobeDeadBand =
+      StrobeMotion.minimumChange / StrobeMotion.pointsPerSecondPerCent
+
     // The trace refresh fires every this many hops by default
     public nonisolated static let defaultTraceInterval: UInt64 = 16
 
@@ -292,9 +297,19 @@ public final class DisplayModel
             redraw = true
         }
 
-        if strobeCents != shown.strobe
+        // A change too small to alter the strobe's speed is held, so a
+        // steady note does not run the strobe's body on every hop; a
+        // forced publish, a stop to zero and a change of look are always
+        // exact
+        if force || (shown.strobe == 0 && strobeCents != 0) ||
+             abs(shown.strobe - strobeCents) >= DisplayModel.strobeDeadBand ||
+             StrobeMotion.look(cents: shown.strobe) !=
+               StrobeMotion.look(cents: strobeCents)
         {
-            strobeCents = shown.strobe
+            if strobeCents != shown.strobe
+            {
+                strobeCents = shown.strobe
+            }
         }
 
         if meterCents != shown.meter
