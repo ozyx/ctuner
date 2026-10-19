@@ -24,6 +24,7 @@
 
 import AppKit
 import Observation
+import TunerSource
 import TunerState
 
 @Observable
@@ -46,9 +47,8 @@ final class AppModel
 
     init()
     {
-        do
+        if let backend = makeBackend()
         {
-            let backend = try EngineBackend()
             let controller = CaptureController(backend: backend,
                                                model: display,
                                                settings: settings)
@@ -75,11 +75,6 @@ final class AppModel
             capture = controller
         }
 
-        catch
-        {
-            captureFailure = error.message
-        }
-
         // The first activation is the first start and the permission
         // request (R30); later ones retry a denied, absent or failed input
         observe(NSApplication.didBecomeActiveNotification)
@@ -101,6 +96,42 @@ final class AppModel
         {
             $0.updateVisibility()
         }
+    }
+
+    // makeBackend: a file or tone when the launch asks for one with
+    // -InputSource (R10), the default input otherwise. The flag is
+    // read from the argument domain and never saved (R11). A bad value
+    // or an unreadable file is the capture failure, shown in the window.
+    private func makeBackend() -> (any CaptureBackend)?
+    {
+        do
+        {
+            let arguments = UserDefaults.standard.volatileDomain(
+              forName: UserDefaults.argumentDomain)
+            if let spec = try InputSource.source(arguments: arguments)
+            {
+                return try SourceBackend(spec, settings: RunSettings(settings))
+            }
+
+            return try EngineBackend()
+        }
+
+        catch let error as SourceError
+        {
+            captureFailure = error.message
+        }
+
+        catch let error as CaptureError
+        {
+            captureFailure = error.message
+        }
+
+        catch
+        {
+            captureFailure = "\(error)"
+        }
+
+        return nil
     }
 
     // observe: run an action on the main actor for each notification

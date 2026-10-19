@@ -67,7 +67,7 @@ let package = Package(
         // The SwiftUI window on the same state layer
         .executableTarget(
             name: "TunerApp",
-            dependencies: ["TunerState"],
+            dependencies: ["TunerState", "TunerSource"],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .defaultIsolation(MainActor.self),
