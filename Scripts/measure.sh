@@ -72,17 +72,31 @@ allocs()
 {
     need_pid
 
-    # Events recorded so far; each count is a heap allocation or free
+    events=$(mktemp)
+    trap 'rm -f "$events"' EXIT
+
+    # Events recorded so far, those with the strobe layer on the stack, and
+    # the second the dump began. Each event is a heap allocation or free.
+    # The dump of a long log takes many seconds, so the rate divides by the
+    # time between the two dumps, not by the sleep.
     count()
     {
-        malloc_history "$PID" -allEvents 2> /dev/null | grep -c 'ALLOC\|FREE' || true
+        began=$(date +%s)
+        malloc_history "$PID" -allEvents 2> /dev/null > "$events"
+        echo "$(grep -c 'ALLOC\|FREE' "$events" || true)" \
+             "$(grep -c 'StrobeLayer' "$events" || true)" "$began"
     }
 
-    first=$(count)
+    set -- $(count)
+    first=$1 first_strobe=$2 began_first=$3
     sleep 10
-    second=$(count)
-    echo "measure: $((second - first)) heap events in 10 s on pid $PID"
-    echo "per second: $(( (second - first) / 10 ))"
+    set -- $(count)
+    second=$1 second_strobe=$2
+    elapsed=$(($3 - began_first))
+    echo "measure: $((second - first)) heap events in $elapsed s on pid $PID"
+    echo "per second: $(( (second - first) / elapsed ))"
+    echo "with the strobe layer on the stack: $(( (second_strobe - first_strobe) / elapsed )) per second"
+    echo "note: the first rate includes every SwiftUI redraw; the strobe path is the second"
 }
 
 main_thread()
@@ -92,9 +106,17 @@ main_thread()
     trap 'rm -f "$out"' EXIT
     sample "$PID" 5 -file "$out" > /dev/null
 
-    # The main thread's block runs to the next thread header
-    awk '/^    Thread_/ { show = ($0 ~ /main-thread/) } show' "$out" |
-        grep -E 'TunerEngine|TunerCore|vDSP|ProcessBlock|analysis' ||
+    # The main thread's block runs to the next thread header, which sample
+    # writes as "<count> Thread_<id>: <name>"; the main one is "Main Thread"
+    block=$(awk '/^    [0-9]+ Thread_/ { show = ($0 ~ /Main Thread/) } show' "$out")
+    if [ -z "$block" ]
+    then
+        echo "measure: no main thread block in the sample" >&2
+        exit 1
+    fi
+
+    # Not bare vDSP: CoreText calls it for glyph advances when a Canvas draws text
+    echo "$block" | grep -E 'TunerEngine|TunerCore|ProcessBlock|analysis' ||
         echo "measure: no analysis function on the main thread"
 }
 
