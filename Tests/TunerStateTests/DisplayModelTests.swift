@@ -39,6 +39,12 @@ private let kC5 = Hop(sequence: 0, found: true, note: 60, cents: -10,
 // A hop with no note
 private let kSilence = Hop(sequence: 0, found: false)
 
+// Set by an observation's onChange, which must be Sendable
+private final class Flag: @unchecked Sendable
+{
+    var raised = false
+}
+
 // Feeds hops to a model with a running sequence and clock
 @MainActor
 private final class Feeder
@@ -113,6 +119,68 @@ struct DisplayModelTests
         #expect(!model.isStale)
         #expect(model.reading?.note == 60)
         #expect(model.readoutTick > tick)
+    }
+
+    // R22: a change of the strobe cents too small to alter the layer
+    // animation's speed must not publish, or SwiftUI runs the strobe's
+    // body on every hop of a steady note
+    @Test func strobeIgnoresChangesBelowTheSpeedThreshold()
+    {
+        let feeder = Feeder()
+        let model = feeder.model
+
+        feeder.feed(kA4, at: 0)
+        #expect(model.strobeCents == 3)
+
+        let changed = Flag()
+        withObservationTracking
+        {
+            _ = model.strobeCents
+        }
+        onChange:
+        {
+            changed.raised = true
+        }
+
+        // Just under the dead band: held, and nothing observes a change
+        var jitter = kA4
+        jitter.cents = 3 + DisplayModel.strobeDeadBand * 0.9
+        feeder.feed(jitter)
+        #expect(model.strobeCents == 3)
+        #expect(!changed.raised)
+
+        // At the dead band it moves
+        jitter.cents = 3 + DisplayModel.strobeDeadBand
+        feeder.feed(jitter)
+        #expect(model.strobeCents == jitter.cents)
+        #expect(changed.raised)
+
+        // Silence still stops it exactly
+        feeder.feed(kSilence, at: feeder.now + DisplayModel.staleAfter)
+        #expect(model.strobeCents == 0)
+    }
+
+    // A held strobe value must not keep the wrong look: crossing a look
+    // boundary publishes even when the change is inside the dead band
+    @Test func strobeCrossingALookBoundaryPublishesInsideTheDeadBand()
+    {
+        let feeder = Feeder()
+        let model = feeder.model
+
+        for boundary in [StrobeMotion.gradientAbove, StrobeMotion.flatAbove]
+        {
+            var below = kA4
+            below.cents = boundary - DisplayModel.strobeDeadBand * 0.25
+            feeder.feed(below)
+            #expect(model.strobeCents == below.cents)
+
+            var above = kA4
+            above.cents = boundary + DisplayModel.strobeDeadBand * 0.25
+            feeder.feed(above)
+            #expect(model.strobeCents == above.cents)
+            #expect(StrobeMotion.look(cents: model.strobeCents) !=
+                      StrobeMotion.look(cents: below.cents))
+        }
     }
 
     @Test func blankUntilFirstNoteThenTextAtMostEveryTenthOfASecond()
