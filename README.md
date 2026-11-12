@@ -3,8 +3,8 @@
 A musical instrument strobe tuner with cents and frequency
 display. With additional features useful for tuning accordions or
 melodeons. The strobe display may be replaced with the staff, if
-required. This fork is the [Mac](App) app, with a legacy
-[Linux](linux) port. An
+required. This fork is the [Mac](App) app (SwiftUI, macOS 26 or later),
+with a [Linux](linux) port (GTK and ALSA). An
 [Android](https://github.com/billthefarmer/tuner) version is
 available, also on
 [F-Droid](https://f-droid.org/packages/org.billthefarmer.tuner).
@@ -31,7 +31,7 @@ Transform together with the phase difference between sequential
 runs of the FFT to measure the actual frequency accurately. It
 appears to be about as accurate as the clock in the sound
 card. The filter is a single pole Butterworth filter with a
-corner frequency of 120Hz. The output of the FFT is scanned by a
+corner frequency of 480Hz. The output of the FFT is scanned by a
 peak detector which detects up to eight peaks in the
 spectrum. The highest peak is taken as the measured note, other
 peaks are shown on the zoomed in spectrum if within range, all of
