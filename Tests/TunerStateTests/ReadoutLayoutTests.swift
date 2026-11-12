@@ -171,6 +171,27 @@ struct ReadoutLayoutTests
         #expect(height(layout, measure) < 160)
     }
 
+    @Test func theSecondRowSetsTheSizeWhenItsFiguresAreWide()
+    {
+        let plain = fake()
+        let measure = ReadoutLayout.Measure(
+            lineHeight: plain.lineHeight,
+            width:
+            {
+                text, size, weight in
+                let wide = (text == ReadoutLayout.centsText
+                            || text == ReadoutLayout.differenceText) ? 2.5 : 1.0
+                return plain.width(text, size, weight) * wide
+            })
+        let layout = ReadoutLayout(width: 540, height: 192, measure: measure)
+
+        let rows = widths(layout, measure)
+        #expect(rows[1] <= 540)
+        #expect(rows[1] > 539)
+        #expect(rows[0] < rows[1])
+        #expect(rows[2] < rows[1])
+    }
+
     @Test func sizesDoNotDependOnAnyReading()
     {
         // The same pane and font give the same sizes every time

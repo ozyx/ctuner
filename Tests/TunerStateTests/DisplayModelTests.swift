@@ -381,13 +381,20 @@ struct DisplayModelTests
     {
         let feeder = Feeder()
         var hop = kA4
+        hop.cents = 10
+        feeder.feed(hop, for: 2)
+
+        // A short burst inside the tolerance: the raw reading is in tune
+        // while the smoothed meter is still on its way down
         hop.cents = 4.9
+        feeder.feed(hop, for: 0.12)
+        #expect(feeder.model.reading?.cents == 4.9)
+        #expect(DisplayModel.inTune(4.9, tolerance: 5))
+        #expect(!DisplayModel.inTune(feeder.model.meterCents, tolerance: 5))
+
+        // Held there, the meter settles inside it
         feeder.feed(hop, for: 2)
         #expect(DisplayModel.inTune(feeder.model.meterCents, tolerance: 5))
-
-        hop.cents = 5.1
-        feeder.feed(hop, for: 2)
-        #expect(!DisplayModel.inTune(feeder.model.meterCents, tolerance: 5))
     }
 
     @Test func meterReachesSixtyThreePercentInEightyMilliseconds()

@@ -70,14 +70,15 @@ public struct ReadoutLayout: Equatable, Sendable
     // The widest strings each row is fitted to. Digits are monospaced, so
     // 8 stands for any digit. The highest note, B8, is about 7902 Hz, the
     // engine drops a reading beyond 60 cents, and 60 cents of B8 is about
-    // 279 Hz. The reference field takes 300 to 500 Hz.
+    // 279 Hz. The reference field takes 300 to 500 Hz. The figures that can
+    // be signed carry a plus, which is wider than a minus in the font.
     public static let noteLetters = Set(Notes.names).sorted()
     public static let octaveDigit = "8"
     public static let accidentals = Set(Notes.symbols).subtracting([""])
       .sorted()
     public static let frequencyText = "8888.88 Hz"
-    public static let centsText = "-60.0\u{00A2}"
-    public static let differenceText = "-888.88 Hz"
+    public static let centsText = "+60.0\u{00A2}"
+    public static let differenceText = "+888.88 Hz"
     public static let targetText = "target 8888.88 Hz"
     public static let lockText = "L"
     public static let referenceText = "A4 = 888.88 Hz"
