@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A musical instrument strobe tuner (by Bill Farmer, GPLv3) with three independent native ports. There is no shared code between ports; each is a self-contained GUI app with its own copy of the FFT/peak-detection pipeline and its own temperament table. The Mac app is the Swift package at the repo root (`Sources/`, `App/`).
+A musical instrument strobe tuner (by Bill Farmer, GPLv3) with two independent native ports. There is no shared code between ports; each is a self-contained GUI app with its own copy of the FFT/peak-detection pipeline and its own temperament table. The Mac app is the Swift package at the repo root (`Sources/`, `App/`).
 
 | Dir | Platform | Language / toolkit | Status |
 | --- | --- | --- | --- |
 | `Sources/`, `App/` | macOS 26+ (arm64) | SwiftUI window on a C core, with AVAudioEngine capture | Current Mac app; most active |
-| `linux/` | Linux | C++, GTK3 + ALSA (`tuner.cpp`); `tuner.c` is an older GTK2 version | Current |
-| `mac/` | macOS 10.4 (i386, Carbon) | C | Legacy, superseded by the package at the root |
+| `linux/` | Linux | C++, GTK3 + ALSA (`tuner.cpp`) | Current |
 
 `docs/` is a generated Hugo site (GitHub Pages), not source. CI is `.github/workflows/build.yml`. `docs/solutions/` holds documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type).
 
@@ -44,7 +43,7 @@ Golden fixtures: `Tests/TunerCoreTests/Fixtures/` holds committed inputs and the
 
 Package notes: on the Command Line Tools, `swift test` finds the Swift Testing macro plugin only about half the time, so the root `Makefile` adds `-plugin-path` for it when `xcode-select -p` is the Command Line Tools and leaves it out on an Xcode toolchain such as CI's. Run tests through `make`, not bare `swift test`. No target may use `unsafeFlags`; compiler policy goes in pragmas and attributes in source, so the library products stay usable as dependencies.
 
-Linux notes: use the plain `Makefile`, not autoconf. Running `./configure` overwrites `Makefile` with one that doesn't work; `Makefile.de` is the backup.
+Linux notes: `linux/Makefile` is the whole build and compiles `tuner.cpp` only; there is no autoconf.
 
 ## Swift app architecture
 
