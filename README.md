@@ -36,3 +36,15 @@ peak detector which detects up to eight peaks in the
 spectrum. The highest peak is taken as the measured note, other
 peaks are shown on the zoomed in spectrum if within range, all of
 them are displayed if the multiple option is on.
+
+## License
+
+This program is free software, licensed under the GNU General
+Public License, version 3 or later. See [LICENSE](LICENSE).
+
+This repository is a fork of Bill Farmer's
+[ctuner](https://github.com/billthefarmer/ctuner). The Mac app's
+audio engine derives from his code, so any change of license would
+need his permission. The legacy ports in [linux](linux) and
+[mac](mac) keep their own notices, GPL version 2 or later, and their
+own `COPYING` files.
