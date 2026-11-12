@@ -13,7 +13,8 @@ instruments
  * Display frequency, cents, frequency deviation for single reed or up to eight
  * Strobe with choice of colours
  * Staff displays current note
- * Meter shows cents deviation
+ * Meter shows cents deviation, with the in-tune zone drawn on it; the
+   zone is 1, 2 or 5 cents either side of zero, chosen in Settings
  * Display lock
  * Audio lowpass filter for bass reeds
  * Experimental downsampling for bass reeds

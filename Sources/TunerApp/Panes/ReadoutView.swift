@@ -15,12 +15,17 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-//  The readout (R7, R8): single mode with the note dominant, the
-//  measured Hz sized for the widest value, target and difference
-//  below and the A4 reference last; multiple-reed mode with one row
-//  per maximum. Blank before the first reading, greyed when stale,
-//  an "L" badge when locked. Semantic colours only (KTD9).
+//  The readout, as docs/plans/2026-11-11-1526-feat-readout-cents-meter-scale-plan.md
+//  amends it. Single mode has three rows sized together by ReadoutLayout
+//  from the pane: the note and the measured Hz, then the signed cents
+//  under the note and the signed Hz difference under the Hz, then the
+//  target, the lock badge and the A4 reference in small secondary text.
+//  Multiple-reed mode has one row per maximum. Blank before the first
+//  reading, greyed when stale, an "L" badge when locked: in the third row
+//  in single mode, in the corner in multiple-reed mode and before a first
+//  reading, when there is no third row. Semantic colours only (KTD9).
 
+import AppKit
 import SwiftUI
 import TunerState
 
@@ -50,6 +55,7 @@ struct ReadoutView: View
                         SingleReadout(reading: reading,
                                       transpose: model.settings.transpose,
                                       reference: model.settings.reference,
+                                      locked: model.display.isLocked,
                                       size: geometry.size)
                     }
                 }
@@ -59,10 +65,9 @@ struct ReadoutView: View
             .opacity(model.display.isStale ? 0.4 : 1)
             .overlay(alignment: .bottomLeading)
             {
-                if model.display.isLocked
+                if showsCornerBadge
                 {
-                    Text("L")
-                        .font(.system(size: 12, weight: .bold))
+                    LockBadge(size: 12)
                         .padding(2)
                 }
             }
@@ -73,75 +78,150 @@ struct ReadoutView: View
             Signposts.readout(tick)
         }
     }
+
+    private var showsCornerBadge: Bool
+    {
+        return model.display.isLocked
+          && (model.settings.multiple || model.display.reading == nil)
+    }
+}
+
+private struct LockBadge: View
+{
+    let size: CGFloat
+
+    var body: some View
+    {
+        Text(ReadoutLayout.lockText)
+            .font(.system(size: size, weight: .bold))
+    }
+}
+
+// The system font with monospaced digits, which the rows draw, measured
+// for ReadoutLayout
+private enum ReadoutFont
+{
+    nonisolated static let measure = ReadoutLayout.Measure(
+        lineHeight:
+        {
+            size, weight in
+            let font = ReadoutFont.font(size, weight)
+            return Double(font.ascender - font.descender + font.leading)
+        },
+        width:
+        {
+            text, size, weight in
+            let font = ReadoutFont.font(size, weight)
+            let measured = NSAttributedString(string: text,
+                                              attributes: [.font: font])
+            return Double(measured.size().width)
+        })
+
+    nonisolated private static func font(_ size: Double,
+                                         _ weight: ReadoutLayout.Weight)
+      -> NSFont
+    {
+        return NSFont.monospacedDigitSystemFont(
+          ofSize: size, weight: (weight == .bold) ? .bold : .regular)
+    }
+}
+
+private enum ReadoutLayoutCache
+{
+    private static var last: (width: Double, height: Double,
+                              layout: ReadoutLayout)?
+
+    static func layout(width: Double, height: Double) -> ReadoutLayout
+    {
+        if let last, last.width == width, last.height == height
+        {
+            return last.layout
+        }
+
+        let layout = ReadoutLayout(width: width, height: height,
+                                   measure: ReadoutFont.measure)
+        last = (width, height, layout)
+        return layout
+    }
 }
 
 // The single-note layout
 private struct SingleReadout: View
 {
+    private static let inset = 2.0
+
     let reading: Reading
     let transpose: Int
     let reference: Double
+    let locked: Bool
     let size: CGSize
 
     var body: some View
     {
         let shown = reading.displayNote(transpose: transpose)
-        let large = size.height / 2
-        let medium = size.height / 3
-        let small = size.height / 5
+        let layout = ReadoutLayoutCache.layout(
+          width: size.width - 2 * SingleReadout.inset, height: size.height)
+        let gap = ReadoutLayout.minimumGap
 
-        // The Hz number takes the room beside the note, sized for the
-        // widest value so it does not change size between notes
-        let room = max(size.width - large * 1.6 - 16, 40)
-        let hzSize = min(medium, room / 6.2)
-
-        // The rows below shrink to fit the width
-        let rowSize = min(small, (size.width - 16) / 17)
-
-        VStack(alignment: .leading, spacing: 4)
+        VStack(alignment: .leading, spacing: ReadoutLayout.rowSpacing)
         {
             HStack(alignment: .firstTextBaseline)
             {
                 HStack(alignment: .firstTextBaseline, spacing: 0)
                 {
                     Text(shown.name)
-                        .font(.system(size: large, weight: .bold))
+                        .font(.system(size: layout.note, weight: .bold))
 
                     // The octave sits on the note's baseline, the
                     // accidental raised above it, as the old view drew
                     Text(String(shown.octave))
-                        .font(.system(size: large / 2, weight: .bold))
+                        .font(.system(size: layout.mark, weight: .bold))
                         .overlay(alignment: .topLeading)
                         {
                             Text(shown.symbol)
-                                .font(.system(size: large / 2, weight: .bold))
+                                .font(.system(size: layout.mark,
+                                              weight: .bold))
                                 .fixedSize()
-                                .offset(y: -large / 2)
+                                .offset(y: -layout.mark)
                         }
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: gap)
 
                 Text(String(format: "%.2f Hz", reading.frequency))
-                    .font(.system(size: hzSize, weight: .bold)
+                    .font(.system(size: layout.frequency, weight: .bold)
                             .monospacedDigit())
             }
             .lineLimit(1)
 
             HStack
             {
-                Text(String(format: "target %.2f Hz", reading.reference))
-                Spacer(minLength: 8)
-                Text(String(format: "%+.2f Hz", reading.difference))
+                Text(reading.centsText)
+                Spacer(minLength: gap)
+                Text(reading.differenceText)
             }
-            .font(.system(size: rowSize, weight: .bold).monospacedDigit())
+            .font(.system(size: layout.deviation, weight: .bold)
+                    .monospacedDigit())
             .lineLimit(1)
 
-            Text(String(format: "A4 = %.2f Hz", reference))
-                .font(.system(size: rowSize, weight: .bold).monospacedDigit())
-                .lineLimit(1)
+            HStack
+            {
+                Text(String(format: "target %.2f Hz", reading.reference))
+                Spacer(minLength: gap)
+
+                if locked
+                {
+                    LockBadge(size: layout.detail)
+                    Spacer(minLength: gap)
+                }
+
+                Text(String(format: "A4 = %.2f Hz", reference))
+            }
+            .font(.system(size: layout.detail).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
-        .padding(.horizontal, 2)
+        .padding(.horizontal, SingleReadout.inset)
     }
 }
 

@@ -48,6 +48,52 @@ struct CopyFormatTests
         #expect(reading.copyLine(transpose: kNoTranspose) == kA4Line)
     }
 
+    @Test func secondRowFiguresOfANoteTwoCentsSharp()
+    {
+        // A4 at 2 cents sharp, against a 440 Hz target
+        let reading = Reading(note: 57, cents: 2,
+                              frequency: 440 * pow(2, 2.0 / 1200),
+                              reference: 440, reeds: [])
+
+        #expect(reading.centsText == "+2.0\u{00A2}")
+        #expect(reading.differenceText == "+0.51 Hz")
+    }
+
+    @Test func secondRowFiguresRoundToOneAndTwoPlaces()
+    {
+        let reading = Reading(note: 57, cents: -12.34, frequency: 436.544,
+                              reference: 440, reeds: [])
+
+        #expect(reading.centsText == "-12.3\u{00A2}")
+        #expect(reading.differenceText == "-3.46 Hz")
+    }
+
+    @Test func aReadingAHairFlatKeepsItsSign()
+    {
+        let reading = Reading(note: 57, cents: -0.04, frequency: 439.996,
+                              reference: 440, reeds: [])
+
+        #expect(reading.centsText == "-0.0\u{00A2}")
+        #expect(reading.differenceText == "-0.00 Hz")
+    }
+
+    @Test func theWidestReadingFitsTheStringsTheLayoutSizesFor()
+    {
+        // 60 cents flat at B8, the top note and the engine's limit
+        let target = 440 * pow(2, 50.0 / 12)
+        let reading = Reading(note: 107, cents: -60,
+                              frequency: target * pow(2, -60.0 / 1200),
+                              reference: target, reeds: [])
+
+        #expect(reading.centsText.count <= ReadoutLayout.centsText.count)
+        #expect(reading.differenceText.count
+                <= ReadoutLayout.differenceText.count)
+        #expect(String(format: "%.2f Hz", reading.frequency).count
+                <= ReadoutLayout.frequencyText.count)
+        #expect(String(format: "target %.2f Hz", reading.reference).count
+                <= ReadoutLayout.targetText.count)
+    }
+
     @Test func flatNoteBelowTarget()
     {
         // E flat 3 at -12.50 cents, 154.65 Hz against 155.56 Hz

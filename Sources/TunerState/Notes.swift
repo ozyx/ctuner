@@ -149,6 +149,16 @@ public struct Reading: Equatable, Sendable
         return DisplayNote(note: note, transpose: transpose)
     }
 
+    public var centsText: String
+    {
+        return String(format: "%+.1f\u{00A2}", cents)
+    }
+
+    public var differenceText: String
+    {
+        return String(format: "%+.2f Hz", difference)
+    }
+
     // copyLine: today's c key line for the primary note
     public func copyLine(transpose: Int) -> String
     {

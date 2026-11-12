@@ -46,6 +46,9 @@ public final class Settings
     // The spectrum expands in powers of two
     public nonisolated static let expandRange = 1 ... 16
 
+    public nonisolated static let inTuneToleranceChoices = [1, 2, 5]
+    public nonisolated static let defaultInTuneTolerance = 5
+
     // The note filter's two independent sets, as wide as the core's masks
     public nonisolated static let noteCount = Int(kTunerNotes)
     public nonisolated static let octaveCount = Int(kTunerOctaves)
@@ -69,6 +72,7 @@ public final class Settings
         static let octaves = "octaves"
         static let expand = "expand"
         static let inspector = "inspector"
+        static let inTuneTolerance = "inTuneTolerance"
     }
 
     // The nine keys today's app writes
@@ -257,6 +261,20 @@ public final class Settings
         didSet { defaults.set(inspector, forKey: Key.inspector) }
     }
 
+    // The meter shows in tune within this many cents either side of zero
+    public var inTuneTolerance: Int
+    {
+        didSet
+        {
+            if !Settings.inTuneToleranceChoices.contains(inTuneTolerance)
+            {
+                inTuneTolerance = oldValue
+                return
+            }
+            defaults.set(inTuneTolerance, forKey: Key.inTuneTolerance)
+        }
+    }
+
     // The engine these settings drive; every engine setting is applied
     // when one is attached
     @ObservationIgnored public var engine: Engine?
@@ -332,6 +350,11 @@ public final class Settings
         expand = Settings.clamp(Settings.read(defaults, Key.expand, nil, 1),
                                 Settings.expandRange)
         inspector = Settings.read(defaults, Key.inspector, nil, false)
+
+        let tolerance = Settings.read(defaults, Key.inTuneTolerance, nil,
+                                      Settings.defaultInTuneTolerance)
+        inTuneTolerance = Settings.inTuneToleranceChoices.contains(tolerance)
+          ? tolerance : Settings.defaultInTuneTolerance
     }
 
     // cycleColour: the next strobe colours, then back to the first

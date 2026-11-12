@@ -16,8 +16,9 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //  The Settings window (R15): the reference frequency, transpose,
-//  temperament and key on General, the strobe colours on Strobe. The
-//  toggles live in the toolbar and the View menu, not here.
+//  temperament, key and the meter's in-tune tolerance on General, the
+//  strobe colours on Strobe. The toggles live in the toolbar and the View
+//  menu, not here.
 
 import SwiftUI
 import TunerState
@@ -103,6 +104,16 @@ struct GeneralSettings: View
                 ForEach(keyNames.indices, id: \.self)
                 {
                     Text(keyNames[$0]).tag($0)
+                }
+            }
+
+            Picker("In-tune tolerance", selection: $settings.inTuneTolerance)
+            {
+                ForEach(TunerState.Settings.inTuneToleranceChoices,
+                        id: \.self)
+                {
+                    Text($0 == 1 ? "\u{B1}1 cent" : "\u{B1}\($0) cents")
+                        .tag($0)
                 }
             }
         }
