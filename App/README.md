@@ -5,6 +5,10 @@ instruments
 
 ![The Tuner window: readout, strobe and meter](../docs/images/Tuner-swift.png)
 
+With the inspector open: scope, spectrum and note filter.
+
+![The Tuner window with the inspector](../docs/images/Tuner-inspector.png)
+
  * Oscilloscope
  * Spectrum with zoom, shows individual reeds
  * Display frequency, cents, frequency deviation for single reed or up to eight

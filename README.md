@@ -11,6 +11,10 @@ available, also on
 
 ![The Tuner window: readout, strobe and meter](docs/images/Tuner-swift.png)
 
+With the inspector open: scope, spectrum and note filter.
+
+![The Tuner window with the inspector](docs/images/Tuner-inspector.png)
+
 ## Using
 
 See [App/README.md](App/README.md) for the Mac app's features,
