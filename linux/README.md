@@ -1,4 +1,4 @@
-# Musical instrument strobe tuner [![Build Status](https://travis-ci.org/billthefarmer/ctuner.svg?branch=master)](https://travis-ci.org/billthefarmer/ctuner)
+# Musical instrument strobe tuner
 
 A musical instrument strobe tuner with cents and frequency
 display. With additional features useful for tuning accordions or
@@ -20,10 +20,7 @@ around the current note and includes all concurrent notes within that
 range.
 
 ## Building
-Use the simple makefile provided. The convoluted GNU
-autoconfig/automake system appears to work, but overwrites the
-makefile with one that doesn't work. There is a backup in
-`Makefile.de`.
+Use the simple makefile provided.
 
 ### Raspberry Pi
 The app builds ok on a pi, but will not work because of the lack of an
