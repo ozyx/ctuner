@@ -159,11 +159,6 @@ public final class DisplayModel
         return (reading == nil) ? .blank : isStale ? .stale : .live
     }
 
-    public var inTune: Bool
-    {
-        return DisplayModel.inTune(meterCents)
-    }
-
     @ObservationIgnored private let traceInterval: UInt64
     @ObservationIgnored private var live = Shown()
     @ObservationIgnored private var held: Shown?
@@ -183,6 +178,15 @@ public final class DisplayModel
     public nonisolated static func inTune(_ cents: Double) -> Bool
     {
         return abs(cents) <= inTuneCents
+    }
+
+    // inTune: within the tolerance in cents either side of zero,
+    // inclusive. The meter passes its smoothed value, so the colour agrees
+    // with where the bar ends against the drawn zone.
+    public nonisolated static func inTune(_ cents: Double,
+                                          tolerance: Int) -> Bool
+    {
+        return abs(cents) <= Double(tolerance)
     }
 
     // update: one hop, with the time in seconds it arrived

@@ -363,24 +363,31 @@ struct DisplayModelTests
         #expect(model.reading?.note == 60)
     }
 
-    @Test func inTuneWithinFiveCentsInclusive()
+    @Test(arguments: [1, 2, 5])
+    func inTuneWithinTheToleranceInclusive(tolerance: Int)
     {
-        #expect(DisplayModel.inTune(4.9))
-        #expect(DisplayModel.inTune(5.0))
-        #expect(!DisplayModel.inTune(5.1))
-        #expect(DisplayModel.inTune(-5.0))
-        #expect(!DisplayModel.inTune(-5.1))
+        let edge = Double(tolerance)
 
-        // The model's flag follows the meter
+        #expect(DisplayModel.inTune(0, tolerance: tolerance))
+        #expect(DisplayModel.inTune(edge, tolerance: tolerance))
+        #expect(DisplayModel.inTune(-edge, tolerance: tolerance))
+        #expect(!DisplayModel.inTune(edge + 0.1, tolerance: tolerance))
+        #expect(!DisplayModel.inTune(-(edge + 0.1), tolerance: tolerance))
+    }
+
+    // The colour follows the smoothed value the bar is drawn from, not
+    // the readout's raw one
+    @Test func inTuneFollowsTheSmoothedMeter()
+    {
         let feeder = Feeder()
         var hop = kA4
         hop.cents = 4.9
         feeder.feed(hop, for: 2)
-        #expect(feeder.model.inTune)
+        #expect(DisplayModel.inTune(feeder.model.meterCents, tolerance: 5))
 
         hop.cents = 5.1
         feeder.feed(hop, for: 2)
-        #expect(!feeder.model.inTune)
+        #expect(!DisplayModel.inTune(feeder.model.meterCents, tolerance: 5))
     }
 
     @Test func meterReachesSixtyThreePercentInEightyMilliseconds()

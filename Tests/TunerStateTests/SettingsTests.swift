@@ -76,6 +76,7 @@ struct SettingsTests
         #expect(!settings.fundamental)
         #expect(!settings.noteFilter)
         #expect(settings.expand == 1)
+        #expect(settings.inTuneTolerance == 5)
 
         // Strobe first, inspector hidden (R32)
         #expect(settings.strobe)
@@ -296,6 +297,43 @@ struct SettingsTests
             colours.append(settings.colour)
         }
         #expect(colours == [1, 2, 0, 1])
+    }
+
+    @Test(arguments: [1, 2, 5])
+    func inTuneToleranceSurvivesRelaunch(tolerance: Int)
+    {
+        let suite = Suite()
+        let settings = Settings(defaults: suite.defaults)
+
+        settings.inTuneTolerance = tolerance
+        #expect(settings.inTuneTolerance == tolerance)
+        #expect(Settings(defaults: suite.defaults).inTuneTolerance
+                == tolerance)
+    }
+
+    @Test func savedToleranceOutsideTheChoicesReadsAsFive()
+    {
+        for saved: Any in [3, 0, -2, 10, "2"]
+        {
+            let suite = Suite()
+            suite.defaults.set(saved, forKey: "inTuneTolerance")
+            #expect(Settings(defaults: suite.defaults).inTuneTolerance == 5)
+        }
+    }
+
+    @Test func toleranceOutsideTheChoicesIsNotStored()
+    {
+        let suite = Suite()
+        let settings = Settings(defaults: suite.defaults)
+
+        settings.inTuneTolerance = 2
+        settings.inTuneTolerance = 3
+        #expect(settings.inTuneTolerance == 2)
+        #expect(suite.defaults.integer(forKey: "inTuneTolerance") == 2)
+
+        settings.inTuneTolerance = 0
+        #expect(settings.inTuneTolerance == 2)
+        #expect(Settings(defaults: suite.defaults).inTuneTolerance == 2)
     }
 
     @Test func referenceRange()
