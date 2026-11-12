@@ -3,10 +3,7 @@
 A musical instrument tuner with extra facilities for tuning free reed
 instruments
 
-|     |     |
-| --- | --- |
-| ![Tuner](https://github.com/billthefarmer/billthefarmer.github.io/blob/master/images/ctuner/Tuner-swift.png) | ![Preferences](https://github.com/billthefarmer/billthefarmer.github.io/blob/master/images/ctuner/Tuner-preferences.png) |
-|     | ![Note Filters](https://github.com/billthefarmer/billthefarmer.github.io/blob/master/images/ctuner/Note-filter.png) |
+![The Tuner window: readout, strobe and meter](../docs/images/Tuner-swift.png)
 
  * Oscilloscope
  * Spectrum with zoom, shows individual reeds

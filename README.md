@@ -9,11 +9,7 @@ with a [Linux](linux) port (GTK and ALSA). An
 available, also on
 [F-Droid](https://f-droid.org/packages/org.billthefarmer.tuner).
 
-|     |     |
-| --- | --- |
-| ![Tuner](https://github.com/billthefarmer/billthefarmer.github.io/raw/master/images/ctuner/Tuner-swift.png) | ![Preferences](https://github.com/billthefarmer/billthefarmer.github.io/raw/master/images/ctuner/Tuner-preferences.png) |
-|     | ![Note Filters](https://github.com/billthefarmer/billthefarmer.github.io/raw/master/images/ctuner/Note-filter.png) |
-
+![The Tuner window: readout, strobe and meter](docs/images/Tuner-swift.png)
 
 ## Using
 
