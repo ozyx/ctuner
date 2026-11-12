@@ -18,53 +18,42 @@
 //  The meter's scale: where a reading in cents falls between the centre
 //  and an end of the track. The middle half of the track covers the 5
 //  cents either side of zero, linearly, so the last few cents of a tuning
-//  get room. The outer quarters cover 5 to 50 cents on a log curve, which
-//  puts 10 cents at 65% of the way out and 20 cents at 80%. The scale does
-//  not depend on the in-tune tolerance setting; only the drawn zone does.
+//  get room. The outer quarters cover 5 to 50 cents on a log curve.
 
 import Foundation
 
 public enum MeterScale
 {
-    // One labelled mark on the scale
     public struct Tick: Equatable, Sendable
     {
         public let cents: Double
-
-        // The signed share of the half track, as position(cents:) gives
         public let position: Double
-
-        // "0", or the value with a sign: "+5", "-50"
         public let label: String
     }
 
-    // The cents at which the linear stretch gives way to the log one, and
-    // the cents at the end of the track
-    public static let innerCents = 5.0
-    public static let outerCents = 50.0
+    public static let linearLimitCents = 5.0
 
     // position(cents:): the signed share of the distance from the centre to
     // the end of the track, from -1 to +1. A reading past an end sits at
-    // the end. The view multiplies it by its own half width.
+    // the end.
     public static func position(cents: Double) -> Double
     {
         let magnitude = abs(cents)
 
         let share: Double
-        if magnitude <= innerCents
+        if magnitude <= linearLimitCents
         {
-            share = magnitude / (2 * innerCents)
+            share = magnitude / (2 * linearLimitCents)
         }
 
         else
         {
-            share = 0.5 + 0.5 * log10(magnitude / innerCents)
+            share = 0.5 + 0.5 * log10(magnitude / linearLimitCents)
         }
 
         return copysign(min(share, 1), cents)
     }
 
-    // The labelled ticks from -50 to +50 cents in order
     public static let ticks: [Tick] =
     {
         let magnitudes: [Double] = [1, 2, 5, 10, 20, 50]

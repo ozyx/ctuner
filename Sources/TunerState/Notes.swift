@@ -149,9 +149,6 @@ public struct Reading: Equatable, Sendable
         return DisplayNote(note: note, transpose: transpose)
     }
 
-    // The readout's second row: the signed cents to one place and the
-    // signed Hz difference to two. The sign is printf's, so a reading a
-    // hair flat prints "-0.0" beside "-0.00 Hz", as the copy line does.
     public var centsText: String
     {
         return String(format: "%+.1f\u{00A2}", cents)

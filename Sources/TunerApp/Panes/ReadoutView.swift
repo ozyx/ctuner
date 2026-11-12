@@ -65,10 +65,7 @@ struct ReadoutView: View
             .opacity(model.display.isStale ? 0.4 : 1)
             .overlay(alignment: .bottomLeading)
             {
-                // The single-note rows carry the badge themselves
-                if model.display.isLocked
-                    && (model.settings.multiple
-                        || model.display.reading == nil)
+                if showsCornerBadge
                 {
                     LockBadge(size: 12)
                         .padding(2)
@@ -81,9 +78,14 @@ struct ReadoutView: View
             Signposts.readout(tick)
         }
     }
+
+    private var showsCornerBadge: Bool
+    {
+        return model.display.isLocked
+          && (model.settings.multiple || model.display.reading == nil)
+    }
 }
 
-// The lock badge
 private struct LockBadge: View
 {
     let size: CGFloat
@@ -124,9 +126,7 @@ private enum ReadoutFont
     }
 }
 
-// The layout for a pane, worked out once per pane size rather than on
-// every reading
-private enum ReadoutSizing
+private enum ReadoutLayoutCache
 {
     private static var last: (width: Double, height: Double,
                               layout: ReadoutLayout)?
@@ -148,7 +148,6 @@ private enum ReadoutSizing
 // The single-note layout
 private struct SingleReadout: View
 {
-    // The padding either side of the rows
     private static let inset = 2.0
 
     let reading: Reading
@@ -160,7 +159,7 @@ private struct SingleReadout: View
     var body: some View
     {
         let shown = reading.displayNote(transpose: transpose)
-        let layout = ReadoutSizing.layout(
+        let layout = ReadoutLayoutCache.layout(
           width: size.width - 2 * SingleReadout.inset, height: size.height)
         let gap = ReadoutLayout.minimumGap
 
@@ -176,14 +175,14 @@ private struct SingleReadout: View
                     // The octave sits on the note's baseline, the
                     // accidental raised above it, as the old view drew
                     Text(String(shown.octave))
-                        .font(.system(size: layout.note / 2, weight: .bold))
+                        .font(.system(size: layout.mark, weight: .bold))
                         .overlay(alignment: .topLeading)
                         {
                             Text(shown.symbol)
-                                .font(.system(size: layout.note / 2,
+                                .font(.system(size: layout.mark,
                                               weight: .bold))
                                 .fixedSize()
-                                .offset(y: -layout.note / 2)
+                                .offset(y: -layout.mark)
                         }
                 }
 
@@ -195,8 +194,6 @@ private struct SingleReadout: View
             }
             .lineLimit(1)
 
-            // The deviation: the cents under the note, the difference
-            // under the Hz
             HStack
             {
                 Text(reading.centsText)
@@ -207,8 +204,6 @@ private struct SingleReadout: View
                     .monospacedDigit())
             .lineLimit(1)
 
-            // The target and the A4 reference, with the lock badge
-            // between them while locked
             HStack
             {
                 Text(String(format: "target %.2f Hz", reading.reference))

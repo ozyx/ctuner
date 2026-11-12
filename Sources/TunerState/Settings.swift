@@ -46,8 +46,6 @@ public final class Settings
     // The spectrum expands in powers of two
     public nonisolated static let expandRange = 1 ... 16
 
-    // The in-tune tolerances the picker offers, in cents either side of
-    // zero, and the one a first launch uses
     public nonisolated static let inTuneToleranceChoices = [1, 2, 5]
     public nonisolated static let defaultInTuneTolerance = 5
 
@@ -263,9 +261,7 @@ public final class Settings
         didSet { defaults.set(inspector, forKey: Key.inspector) }
     }
 
-    // The meter shows in tune within this many cents either side of zero;
-    // display only, so the engine never sees it. A value outside the
-    // choices is ignored.
+    // The meter shows in tune within this many cents either side of zero
     public var inTuneTolerance: Int
     {
         didSet

@@ -18,16 +18,14 @@
 //  The single-note readout's four type sizes, from the pane's size. The
 //  note, the frequency, the second row (cents and Hz difference) and the
 //  third row (target, lock badge and A4 reference) keep the proportions
-//  of the layout sketch the owner chose, 64 : 50 : 36 : 14, and share one
-//  scale factor: the largest at which the three rows fit the pane's
-//  height and each row's widest strings fit its width.
+//  64 : 50 : 36 : 14 and share one scale factor: the largest at which the
+//  three rows fit the pane's height and each row's widest strings fit
+//  its width.
 //
 //  The sizes come from a measuring function the caller supplies, because
 //  the font's width is not proportional to its size: San Francisco tracks
 //  wider below 20 points, where the third row sits. The layout therefore
 //  measures at each candidate size rather than scaling one measurement.
-//  Only the pane and the font set the sizes. No reading enters them, so
-//  the type does not change size from note to note.
 
 import Foundation
 
@@ -39,19 +37,16 @@ public struct ReadoutLayout: Equatable, Sendable
         case bold
     }
 
-    // The font as the layout needs it. The caller measures with monospaced
-    // digits, since the readout draws them that way.
+    // The caller measures with monospaced digits, since the readout draws
+    // them that way
     public struct Measure: Sendable
     {
-        // The height of a line of text at a point size
         public var lineHeight: @Sendable (_ size: Double,
                                           _ weight: Weight) -> Double
 
-        // The width of a string at a point size
         public var width: @Sendable (_ text: String, _ size: Double,
                                      _ weight: Weight) -> Double
 
-        // init
         public init(lineHeight: @escaping @Sendable (_ size: Double,
                                                      _ weight: Weight)
                                   -> Double,
@@ -64,14 +59,11 @@ public struct ReadoutLayout: Equatable, Sendable
         }
     }
 
-    // The sizes at a scale of one, from the sketch the owner chose. The
-    // octave and the accidental are half the note's size.
     public static let noteProportion = 64.0
     public static let frequencyProportion = 50.0
     public static let deviationProportion = 36.0
     public static let detailProportion = 14.0
 
-    // The gap between rows, and the least gap between the strings on one
     public static let rowSpacing = 4.0
     public static let minimumGap = 8.0
 
@@ -79,9 +71,10 @@ public struct ReadoutLayout: Equatable, Sendable
     // 8 stands for any digit. The highest note, B8, is about 7902 Hz, the
     // engine drops a reading beyond 60 cents, and 60 cents of B8 is about
     // 279 Hz. The reference field takes 300 to 500 Hz.
-    public static let noteLetters = ["A", "B", "C", "D", "E", "F", "G"]
+    public static let noteLetters = Set(Notes.names).sorted()
     public static let octaveDigit = "8"
-    public static let accidentals = ["\u{266F}", "\u{266D}"]
+    public static let accidentals = Set(Notes.symbols).subtracting([""])
+      .sorted()
     public static let frequencyText = "8888.88 Hz"
     public static let centsText = "-60.0\u{00A2}"
     public static let differenceText = "-888.88 Hz"
@@ -89,46 +82,52 @@ public struct ReadoutLayout: Equatable, Sendable
     public static let lockText = "L"
     public static let referenceText = "A4 = 888.88 Hz"
 
-    // The sizes in points
     public let note: Double
     public let frequency: Double
     public let deviation: Double
     public let detail: Double
 
-    // init: the sizes for a pane of this width and height in points
+    // The octave and the accidental
+    public var mark: Double { note / 2 }
+
     public init(width: Double, height: Double, measure: Measure)
     {
-        let scale = ReadoutLayout.scale(width: width, height: height,
-                                        measure: measure)
+        self.init(scale: ReadoutLayout.largestFittingScale(
+                    width: width, height: height, measure: measure))
+    }
 
+    private init(scale: Double)
+    {
         note = ReadoutLayout.noteProportion * scale
         frequency = ReadoutLayout.frequencyProportion * scale
         deviation = ReadoutLayout.deviationProportion * scale
         detail = ReadoutLayout.detailProportion * scale
     }
 
-    // scale: the largest factor at which the rows fit. Whether they fit
-    // grows with the factor, so double it until they do not, then halve
-    // the gap between a factor that fits and one that does not. The result
-    // is always one that fits.
-    private static func scale(width: Double, height: Double,
-                              measure: Measure) -> Double
+    private static func largestFittingScale(width: Double, height: Double,
+                                            measure: Measure) -> Double
     {
         var fits = 0.0
         var exceeds = 1.0
 
-        for _ in 0 ..< 40 where rows(at: exceeds, width: width,
-                                     height: height, measure: measure)
+        var doublings = 0
+        while doublings < 40 &&
+                ReadoutLayout(scale: exceeds).fits(width: width,
+                                                   height: height,
+                                                   measure: measure)
         {
             fits = exceeds
             exceeds *= 2
+            doublings += 1
         }
 
-        for _ in 0 ..< 50
+        // A factor of one ten-thousandth moves the note by under a
+        // hundredth of a point
+        while exceeds - fits > 1e-4
         {
             let middle = (fits + exceeds) / 2
-            if rows(at: middle, width: width, height: height,
-                    measure: measure)
+            if ReadoutLayout(scale: middle).fits(width: width, height: height,
+                                                 measure: measure)
             {
                 fits = middle
             }
@@ -142,44 +141,42 @@ public struct ReadoutLayout: Equatable, Sendable
         return fits
     }
 
-    // rows: whether the three rows fit the pane at a scale factor
-    private static func rows(at scale: Double, width: Double,
-                             height: Double, measure: Measure) -> Bool
+    private func fits(width: Double, height: Double, measure: Measure) -> Bool
     {
-        let note = noteProportion * scale
-        let frequency = frequencyProportion * scale
-        let deviation = deviationProportion * scale
-        let detail = detailProportion * scale
-        let half = note / 2
-
         let tall = measure.lineHeight(note, .bold)
           + measure.lineHeight(deviation, .bold)
           + measure.lineHeight(detail, .regular)
-          + 2 * rowSpacing
+          + 2 * ReadoutLayout.rowSpacing
         if tall > height
         {
             return false
         }
 
-        // The note is its widest letter, an octave digit and an
-        // accidental; the last two sit at half size
-        let letter = noteLetters.map { measure.width($0, note, .bold) }.max()!
-        let mark = accidentals.map { measure.width($0, half, .bold) }.max()!
+        let letter = ReadoutLayout.noteLetters
+          .map { measure.width($0, note, .bold) }.max()!
+        let accidental = ReadoutLayout.accidentals
+          .map { measure.width($0, mark, .bold) }.max()!
+        let first = letter + accidental
+          + measure.width(ReadoutLayout.octaveDigit, mark, .bold)
+          + measure.width(ReadoutLayout.frequencyText, frequency, .bold)
+          + ReadoutLayout.minimumGap
+        if first > width
+        {
+            return false
+        }
 
-        let first = letter + mark
-          + measure.width(octaveDigit, half, .bold)
-          + measure.width(frequencyText, frequency, .bold)
-          + minimumGap
-        let second = measure.width(centsText, deviation, .bold)
-          + measure.width(differenceText, deviation, .bold)
-          + minimumGap
+        let second = measure.width(ReadoutLayout.centsText, deviation, .bold)
+          + measure.width(ReadoutLayout.differenceText, deviation, .bold)
+          + ReadoutLayout.minimumGap
+        if second > width
+        {
+            return false
+        }
 
-        // The lock badge's room is kept whether or not it shows
-        let third = measure.width(targetText, detail, .regular)
-          + measure.width(lockText, detail, .bold)
-          + measure.width(referenceText, detail, .regular)
-          + 2 * minimumGap
-
-        return max(first, second, third) <= width
+        let third = measure.width(ReadoutLayout.targetText, detail, .regular)
+          + measure.width(ReadoutLayout.lockText, detail, .bold)
+          + measure.width(ReadoutLayout.referenceText, detail, .regular)
+          + 2 * ReadoutLayout.minimumGap
+        return third <= width
     }
 }
