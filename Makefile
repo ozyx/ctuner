@@ -27,7 +27,7 @@ APPBUNDLES =
 APPDIR = .build
 
 # The DMG is named from the version in the app's Info.plist and holds
-# the app, a link to Applications and the README
+# the app, a link to Applications, the README and the license
 PLB = /usr/libexec/PlistBuddy
 APPVERSION = $(shell $(PLB) -c 'print :CFBundleShortVersionString' App/Info.plist)
 DMG = $(APPDIR)/Tuner-$(APPVERSION).dmg
@@ -57,6 +57,7 @@ dmg: app
 	cp -R $(APPDIR)/Tuner.app $(DMGSTAGE)/
 	ln -s /Applications $(DMGSTAGE)/Applications
 	cp App/README.md $(DMGSTAGE)/
+	cp LICENSE $(DMGSTAGE)/
 	hdiutil create -volname Tuner -srcfolder $(DMGSTAGE) -fs HFS+ \
 		-format UDZO -ov $(DMG)
 	rm -rf $(DMGSTAGE)
