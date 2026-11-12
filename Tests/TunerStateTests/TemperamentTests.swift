@@ -48,7 +48,7 @@ struct TemperamentTests
         // Bach (Klais) and Just (Barbour) are written in Hz from C
         for row in [6, 7]
         {
-            let ratios = Temperaments.ratios(row)
+            let ratios = asRatios(row)
             #expect(ratios.count == 12)
             #expect(ratios[0] == 1)
             for ratio in ratios
@@ -58,12 +58,20 @@ struct TemperamentTests
         }
 
         // Just A is a major sixth, 5/3, above C
-        #expect(abs(Temperaments.ratios(7)[9] - 5.0 / 3.0) < 1e-12)
+        #expect(abs(asRatios(7)[9] - 5.0 / 3.0) < 1e-12)
 
         // Bach (Klais): A 440 over C 262.76
-        #expect(abs(Temperaments.ratios(6)[9] - 440 / 262.76) < 1e-12)
+        #expect(abs(asRatios(6)[9] - 440 / 262.76) < 1e-12)
 
         // A row already in ratios is unchanged
-        #expect(Temperaments.ratios(8) == Temperaments.values[8])
+        #expect(asRatios(8) == Temperaments.values[8])
+    }
+
+    // asRatios: one row as ratios from C, whether it is written in
+    // ratios or in Hz
+    private func asRatios(_ row: Int) -> [Double]
+    {
+        let first = Temperaments.values[row][0]
+        return Temperaments.values[row].map { $0 / first }
     }
 }
