@@ -105,9 +105,6 @@ public final class DisplayModel
     // The meter smoother's time constant
     public nonisolated static let meterTimeConstant = 0.08
 
-    // The meter shows in tune within this many cents, inclusive
-    public nonisolated static let inTuneCents = 5.0
-
     // The strobe cents move only by at least this many cents, the change
     // that alters the layer animation's speed by StrobeMotion's minimum
     public nonisolated static let strobeDeadBand =
@@ -172,12 +169,6 @@ public final class DisplayModel
     public init(traceInterval: UInt64 = DisplayModel.defaultTraceInterval)
     {
         self.traceInterval = traceInterval
-    }
-
-    // inTune
-    public nonisolated static func inTune(_ cents: Double) -> Bool
-    {
-        return abs(cents) <= inTuneCents
     }
 
     // inTune: within the tolerance in cents either side of zero,
