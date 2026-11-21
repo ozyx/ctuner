@@ -1,0 +1,23 @@
+# Checks for people and agents: `mise run test`, `mise run test:filter NAME`.
+# Swift, clang and make come from the Command Line Tools or Xcode, not mise.
+
+[tasks.test]
+description = "Swift package test suite, debug (CI's `make test`)"
+run = "make test"
+
+[tasks."test:filter"]
+description = "Swift tests matching NAME: a test target, suite or test, as a regex (TunerStateTests, StrobeMotionTests)"
+usage = 'arg "<name>" help="swift test --filter pattern"'
+run = "make test TESTFLAGS=\"--filter '${usage_name}'\""
+
+[tasks."test:tones"]
+description = "tuner-run over known tones, each row asserting its exit code (CI's `make tone-checks`)"
+run = "make tone-checks"
+
+[tasks.lint]
+description = "TunerCore warning-free under -Wall -Wextra -Werror, with no Cocoa, ObjC or logging symbols"
+run = "make core-check"
+
+[tasks.build]
+description = "Release Tuner.app and its DMG, as CI builds them (`make dmg`)"
+run = "make dmg"
