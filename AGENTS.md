@@ -20,6 +20,7 @@ Everything is plain `make`. The Swift package at the repo root holds the app, th
 ```sh
 # Swift package (repo root) — Command Line Tools are enough
 make test                   # swift test, debug
+make test TESTFLAGS="--filter StrobeMotionTests"   # one test target, suite or test (regex); mise run test:filter NAME does the same
 make test-release           # swift test, release (the shipped optimisation level)
 make sanitize               # address+undefined, then thread
 make core-check             # the core warning-free under -Wall -Wextra, no Cocoa/ObjC/logging symbols

@@ -74,11 +74,13 @@ measure:
 	@echo "                               idle and with a note playing should match"
 	@echo "Also by hand: the microphone indicator goes off after the pause debounce."
 
+# TESTFLAGS passes options through to swift test, such as
+# TESTFLAGS="--filter TunerStateTests" for one target, suite or test
 test:
-	$(SWIFT) test $(TESTINGPLUGIN)
+	$(SWIFT) test $(TESTINGPLUGIN) $(TESTFLAGS)
 
 test-release:
-	$(SWIFT) test -c release $(TESTINGPLUGIN)
+	$(SWIFT) test -c release $(TESTINGPLUGIN) $(TESTFLAGS)
 
 # Address and undefined behaviour together, then thread on its own,
 # because the thread sanitizer cannot share a run with the others

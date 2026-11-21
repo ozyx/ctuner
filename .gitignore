@@ -8,3 +8,6 @@
 # Compound Engineering config (dotfiles are ignored above)
 !.compound-engineering/
 .compound-engineering/*.local.yaml
+
+# jouet's project checks and map (dotfiles are ignored above)
+!.jouet/

@@ -1,0 +1,10 @@
+[checks]
+full = "mise run test"
+lint = "mise run lint"
+before_push = ["mise run test:tones", "mise run build"]
+
+[checks.focused]
+swift = "jouet test --cmd -- mise run test:filter NAME"
+
+[checks.ci]
+linux = "cd linux && make"
